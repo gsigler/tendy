@@ -1,0 +1,1 @@
+export COMPOSE_PROJECT_NAME="tendy-2026-03-18-make-it-rain-230745"
