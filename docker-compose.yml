@@ -1,4 +1,20 @@
 services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: tendy
+      POSTGRES_PASSWORD: tendy
+      POSTGRES_DB: tendy
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tendy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: .
@@ -10,3 +26,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - DATABASE_URL=postgresql://tendy:tendy@db:5432/tendy
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

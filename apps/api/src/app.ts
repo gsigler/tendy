@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { auth } from "./routes/auth.js";
 import { chat } from "./routes/chat.js";
 import { health } from "./routes/health.js";
+import { authMiddleware } from "./middleware/auth.js";
 
 export const app = new Hono();
 
@@ -10,6 +12,9 @@ app.use("*", logger());
 app.use("*", cors());
 
 app.route("/", health);
+app.route("/api", auth);
+
+app.use("/api/chat", authMiddleware);
 app.route("/api", chat);
 
 app.notFound((c) => {

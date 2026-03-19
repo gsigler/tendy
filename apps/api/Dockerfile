@@ -32,9 +32,14 @@ RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=base /app/packages/shared/dist/ ./packages/shared/dist/
 COPY --from=base /app/apps/api/dist/ ./apps/api/dist/
+COPY --from=base /app/apps/api/drizzle/ ./apps/api/drizzle/
+
+COPY apps/api/docker-entrypoint.sh ./apps/api/
+RUN chmod +x ./apps/api/docker-entrypoint.sh
 
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
+ENTRYPOINT ["./apps/api/docker-entrypoint.sh"]
 CMD ["node", "apps/api/dist/index.js"]
