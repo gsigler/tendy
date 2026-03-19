@@ -17,8 +17,8 @@ RUN pnpm install --frozen-lockfile
 COPY packages/shared/ ./packages/shared/
 COPY apps/api/ ./apps/api/
 
-# Build
-RUN pnpm --filter @tendy/api build
+# Build shared first, then api
+RUN pnpm --filter @tendy/shared build && pnpm --filter @tendy/api build
 
 FROM node:22-slim AS runner
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
@@ -30,7 +30,7 @@ COPY --from=base /app/apps/api/package.json ./apps/api/
 
 RUN pnpm install --frozen-lockfile --prod
 
-COPY --from=base /app/packages/shared/src/ ./packages/shared/src/
+COPY --from=base /app/packages/shared/dist/ ./packages/shared/dist/
 COPY --from=base /app/apps/api/dist/ ./apps/api/dist/
 
 ENV NODE_ENV=production

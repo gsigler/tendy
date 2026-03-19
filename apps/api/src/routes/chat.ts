@@ -6,11 +6,19 @@ import { ChatRequestSchema } from "@tendy/shared";
 export const chat = new Hono();
 
 chat.post("/chat", async (c) => {
-  const body = await c.req.json();
-  const parsed = ChatRequestSchema.safeParse(body);
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
 
+  const parsed = ChatRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "Invalid request", details: parsed.error.flatten() }, 400);
+    return c.json(
+      { error: "Invalid request", details: parsed.error.flatten() },
+      400,
+    );
   }
 
   const result = streamText({
