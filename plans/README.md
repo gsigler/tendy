@@ -47,6 +47,8 @@
 
 | Document | Description |
 |----------|-------------|
+| [18 — Application Review Feedback](18-application-review-feedback.md) | Gaps, missing pieces, and prioritized recommendations |
+| [19 — Revised Architecture](19-revised-architecture.md) | **CURRENT**: TypeScript + AI SDK + Drizzle + React Native (Expo) — replaces .NET stack |
 | [Appendix — Changes from Original Plan](appendix-changes.md) | Key differences from the initial architecture plan |
 | [Original Architecture Plan](agent-first-architecture.md) | The initial C# API architecture plan (superseded) |
 
