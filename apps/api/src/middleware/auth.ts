@@ -31,7 +31,10 @@ export async function signToken(payload: JwtPayload): Promise<string> {
 
 export async function verifyToken(token: string): Promise<JwtPayload> {
   const { payload } = await jose.jwtVerify(token, getJwtSecret());
-  return payload as unknown as JwtPayload;
+  if (typeof payload.sub !== "string" || typeof payload.email !== "string") {
+    throw new Error("Invalid token payload: missing sub or email");
+  }
+  return { sub: payload.sub, email: payload.email };
 }
 
 export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {

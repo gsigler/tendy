@@ -5,7 +5,12 @@ import { ChatRequestSchema } from "@tendy/shared";
 
 export const chat = new Hono();
 
-chat.post("/chat", async (c) => {
+const SYSTEM_PROMPT =
+  "You are Tendy, a friendly gardening assistant. " +
+  "You help people plan, plant, and tend their gardens. " +
+  "Keep responses concise and practical.";
+
+chat.post("/v1/chat", async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -23,10 +28,7 @@ chat.post("/chat", async (c) => {
 
   const result = streamText({
     model: openai("gpt-4o-mini"),
-    system:
-      "You are Tendy, a friendly gardening assistant. " +
-      "You help people plan, plant, and tend their gardens. " +
-      "Keep responses concise and practical.",
+    system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: parsed.data.message }],
   });
 

@@ -8,7 +8,7 @@ export const ChatMessageSchema = z.object({
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
 export const ChatRequestSchema = z.object({
-  message: z.string().min(1),
+  message: z.string().min(1).max(4000),
 });
 
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;

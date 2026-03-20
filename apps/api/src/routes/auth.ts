@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
@@ -8,7 +8,7 @@ import { RegisterRequestSchema, LoginRequestSchema } from "@tendy/shared";
 
 export const auth = new Hono();
 
-auth.post("/auth/register", async (c) => {
+auth.post("/v1/auth/register", async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -25,30 +25,32 @@ auth.post("/auth/register", async (c) => {
   }
 
   const { email, password, name } = parsed.data;
-
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return c.json({ error: "Email already registered" }, 409);
-  }
-
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const [user] = await db
-    .insert(users)
-    .values({ email, name, passwordHash })
-    .returning({ id: users.id, email: users.email, name: users.name });
+  let user: { id: string; email: string; name: string };
+  try {
+    [user] = await db
+      .insert(users)
+      .values({ email, name, passwordHash })
+      .returning({ id: users.id, email: users.email, name: users.name });
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code: string }).code === "23505"
+    ) {
+      return c.json({ error: "Email already registered" }, 409);
+    }
+    throw err;
+  }
 
   const token = await signToken({ sub: user.id, email: user.email });
 
   return c.json({ token, user: { id: user.id, email: user.email, name: user.name } }, 201);
 });
 
-auth.post("/auth/login", async (c) => {
+auth.post("/v1/auth/login", async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();

@@ -11,7 +11,8 @@ const client = postgres(connectionString, { max: 1 });
 const db = drizzle(client);
 
 console.log("Running migrations...");
-await migrate(db, { migrationsFolder: "./drizzle" });
+const migrationsFolder = new URL("../../drizzle", import.meta.url).pathname;
+await migrate(db, { migrationsFolder });
 console.log("Migrations complete.");
 
 await client.end();

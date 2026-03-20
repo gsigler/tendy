@@ -67,33 +67,33 @@ curl http://localhost:3000/health
 # {"status":"ok","service":"tendy-api"}
 ```
 
-### `POST /api/auth/register`
+### `POST /api/v1/auth/register`
 
 Create a new account. Returns a JWT token.
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/register \
+curl -X POST http://localhost:3000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"your-password","name":"Your Name"}'
 ```
 
-### `POST /api/auth/login`
+### `POST /api/v1/auth/login`
 
 Authenticate and get a JWT token.
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/login \
+curl -X POST http://localhost:3000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"you@example.com","password":"your-password"}'
 ```
 
-### `POST /api/chat` (authenticated)
+### `POST /api/v1/chat` (authenticated)
 
 Send a message to the gardening AI. Requires `Authorization: Bearer <token>`. Returns a streaming response (Vercel AI SDK data stream format).
 
 ```bash
 TOKEN="your-jwt-token"
-curl -X POST http://localhost:3000/api/chat \
+curl -X POST http://localhost:3000/api/v1/chat \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"message": "When should I plant tomatoes in zone 7?"}'
@@ -129,7 +129,7 @@ pnpm --filter @tendy/api db:studio
 | Framework | Hono |
 | AI | Vercel AI SDK + OpenAI |
 | Database | PostgreSQL 16 + Drizzle ORM |
-| Auth | JWT (jose) + bcrypt |
+| Auth | JWT (jose) + bcryptjs |
 | Validation | Zod (shared schemas) |
 | Monorepo | pnpm workspaces + Turborepo |
 | Deploy | Docker |

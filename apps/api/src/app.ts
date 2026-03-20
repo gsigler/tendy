@@ -8,13 +8,14 @@ import { authMiddleware } from "./middleware/auth.js";
 
 export const app = new Hono();
 
+const allowedOrigins = process.env.CORS_ORIGINS?.split(",") ?? ["*"];
 app.use("*", logger());
-app.use("*", cors());
+app.use("*", cors({ origin: allowedOrigins }));
 
 app.route("/", health);
 app.route("/api", auth);
 
-app.use("/api/chat", authMiddleware);
+app.use("/api/v1/chat", authMiddleware);
 app.route("/api", chat);
 
 app.notFound((c) => {
