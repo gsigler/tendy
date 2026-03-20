@@ -34,11 +34,13 @@ auth.post("/v1/auth/register", async (c) => {
       .values({ email, name, passwordHash })
       .returning({ id: users.id, email: users.email, name: users.name });
   } catch (err: unknown) {
+    const pgError =
+      err instanceof Error && "cause" in err ? err.cause : err;
     if (
-      typeof err === "object" &&
-      err !== null &&
-      "code" in err &&
-      (err as { code: string }).code === "23505"
+      typeof pgError === "object" &&
+      pgError !== null &&
+      "code" in pgError &&
+      (pgError as { code: string }).code === "23505"
     ) {
       return c.json({ error: "Email already registered" }, 409);
     }

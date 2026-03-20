@@ -11,7 +11,8 @@
     "lint": "eslint src/",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.1.0",
@@ -30,6 +31,7 @@
     "@types/node": "^22.0.0",
     "drizzle-kit": "^0.31.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
   }
 }
