@@ -65,13 +65,13 @@ chat.post("/v1/chat", async (c) => {
     sessionId = session.id;
   }
 
-  // Load conversation history (last 50 messages for context window)
+  // Load recent conversation history (keep small to stay within token limits)
   const history = await db
     .select()
     .from(conversationMessages)
     .where(eq(conversationMessages.sessionId, sessionId))
     .orderBy(asc(conversationMessages.createdAt))
-    .limit(50);
+    .limit(20);
 
   const messages: CoreMessage[] = history
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -104,8 +104,10 @@ chat.post("/v1/chat", async (c) => {
   // Capture sessionId for the async callback (guaranteed non-null at this point)
   const sid = sessionId;
 
+  const modelId = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
   const result = streamText({
-    model: openai("gpt-4o"),
+    model: openai(modelId),
     system: systemPrompt,
     messages,
     tools,
