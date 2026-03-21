@@ -8,6 +8,7 @@ import {
   spaces,
   plantings,
   catalogEntries,
+  catalogReviews,
   tasks,
   events,
   gridPlacements,
@@ -77,6 +78,70 @@ export function createTools(userId: string) {
           location: garden.location,
           hardinessZone: garden.hardinessZone,
         };
+      },
+    }),
+
+    updateGarden: tool({
+      description: "Update a garden's name, location, or hardiness zone",
+      parameters: z.object({
+        gardenId: z.string().uuid(),
+        name: z.string().optional(),
+        location: z.string().optional(),
+        hardinessZone: z.string().optional(),
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
+      }),
+      execute: async ({ gardenId, ...updates }) => {
+        const [updated] = await db
+          .update(gardens)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(and(eq(gardens.id, gardenId), eq(gardens.userId, userId)))
+          .returning();
+        if (!updated) return { error: "Garden not found" };
+        return {
+          id: updated.id,
+          name: updated.name,
+          location: updated.location,
+          hardinessZone: updated.hardinessZone,
+        };
+      },
+    }),
+
+    deleteGarden: tool({
+      description:
+        "Delete a garden and ALL its seasons, spaces, plantings, tasks, and events. Only call after user confirms.",
+      parameters: z.object({
+        gardenId: z.string().uuid(),
+      }),
+      execute: async ({ gardenId }) => {
+        const [garden] = await db
+          .select()
+          .from(gardens)
+          .where(and(eq(gardens.id, gardenId), eq(gardens.userId, userId)));
+        if (!garden) return { error: "Garden not found" };
+
+        // Get all seasons to cascade delete
+        const seasonRows = await db
+          .select({ id: seasons.id })
+          .from(seasons)
+          .where(eq(seasons.gardenId, gardenId));
+
+        for (const s of seasonRows) {
+          const plantingRows = await db
+            .select({ id: plantings.id })
+            .from(plantings)
+            .where(eq(plantings.seasonId, s.id));
+          for (const p of plantingRows) {
+            await db.delete(gridPlacements).where(eq(gridPlacements.plantingId, p.id));
+          }
+          await db.delete(events).where(eq(events.seasonId, s.id));
+          await db.delete(tasks).where(eq(tasks.seasonId, s.id));
+          await db.delete(plantings).where(eq(plantings.seasonId, s.id));
+          await db.delete(spaces).where(eq(spaces.seasonId, s.id));
+        }
+        await db.delete(seasons).where(eq(seasons.gardenId, gardenId));
+        await db.delete(gardens).where(eq(gardens.id, gardenId));
+        return { deleted: true, gardenId };
       },
     }),
 
@@ -388,6 +453,55 @@ export function createTools(userId: string) {
       },
     }),
 
+    updateSpace: tool({
+      description: "Update a space's name, dimensions, sun exposure, or notes",
+      parameters: z.object({
+        spaceId: z.string().uuid(),
+        name: z.string().optional(),
+        type: SpaceType.optional(),
+        width: z.number().int().optional(),
+        length: z.number().int().optional(),
+        sunExposure: z
+          .enum(["full_sun", "partial_sun", "partial_shade", "full_shade"])
+          .optional(),
+        notes: z.string().optional(),
+      }),
+      execute: async ({ spaceId, ...updates }) => {
+        const [updated] = await db
+          .update(spaces)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(eq(spaces.id, spaceId))
+          .returning();
+        if (!updated) return { error: "Space not found" };
+        return {
+          id: updated.id,
+          name: updated.name,
+          type: updated.type,
+          width: updated.width,
+          length: updated.length,
+          sunExposure: updated.sunExposure,
+        };
+      },
+    }),
+
+    deleteSpace: tool({
+      description:
+        "Delete a space and remove all grid placements in it. Plantings are NOT deleted but unlinked. Only call after user confirms.",
+      parameters: z.object({
+        spaceId: z.string().uuid(),
+      }),
+      execute: async ({ spaceId }) => {
+        await db.delete(gridPlacements).where(eq(gridPlacements.spaceId, spaceId));
+        // Unlink plantings from this space
+        await db
+          .update(plantings)
+          .set({ spaceId: null, updatedAt: new Date() })
+          .where(eq(plantings.spaceId, spaceId));
+        await db.delete(spaces).where(eq(spaces.id, spaceId));
+        return { deleted: true, spaceId };
+      },
+    }),
+
     getSpaceGrid: tool({
       description:
         "Get the grid layout for a space showing what is planted where",
@@ -565,6 +679,33 @@ export function createTools(userId: string) {
           variety: planting.variety,
           stage: planting.stage,
           sourceType: planting.sourceType,
+        };
+      },
+    }),
+
+    updatePlanting: tool({
+      description: "Update a planting's notes, quantity, or variety",
+      parameters: z.object({
+        plantingId: z.string().uuid(),
+        variety: z.string().optional(),
+        quantity: z.number().int().optional(),
+        quantityUnit: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      execute: async ({ plantingId, ...updates }) => {
+        const [updated] = await db
+          .update(plantings)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(eq(plantings.id, plantingId))
+          .returning();
+        if (!updated) return { error: "Planting not found" };
+        return {
+          id: updated.id,
+          crop: updated.crop,
+          variety: updated.variety,
+          quantity: updated.quantity,
+          quantityUnit: updated.quantityUnit,
+          notes: updated.notes,
         };
       },
     }),
@@ -848,6 +989,46 @@ Stage transitions auto-set timestamps (started_at, hardened_at, transplanted_at)
       },
     }),
 
+    updateTask: tool({
+      description: "Update a task's title, due date, priority, or notes",
+      parameters: z.object({
+        taskId: z.string().uuid(),
+        title: z.string().optional(),
+        priority: TaskPriority.optional(),
+        dueAt: z.string().optional().describe("New due date ISO string"),
+        notes: z.string().optional(),
+      }),
+      execute: async ({ taskId, dueAt, ...updates }) => {
+        const [updated] = await db
+          .update(tasks)
+          .set({
+            ...updates,
+            ...(dueAt ? { dueAt: new Date(dueAt) } : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(tasks.id, taskId))
+          .returning();
+        if (!updated) return { error: "Task not found" };
+        return {
+          id: updated.id,
+          title: updated.title,
+          priority: updated.priority,
+          dueAt: updated.dueAt?.toISOString() ?? null,
+        };
+      },
+    }),
+
+    deleteTask: tool({
+      description: "Delete a task. Only call after user confirms.",
+      parameters: z.object({
+        taskId: z.string().uuid(),
+      }),
+      execute: async ({ taskId }) => {
+        await db.delete(tasks).where(eq(tasks.id, taskId));
+        return { deleted: true, taskId };
+      },
+    }),
+
     // ── Event Tools ──────────────────────────────────────────────────────
 
     listRecentEvents: tool({
@@ -914,6 +1095,17 @@ Stage transitions auto-set timestamps (started_at, hardened_at, transplanted_at)
           summary: event.summary,
           happenedAt: event.happenedAt.toISOString(),
         };
+      },
+    }),
+
+    deleteEvent: tool({
+      description: "Delete an event/log entry. Only call after user confirms.",
+      parameters: z.object({
+        eventId: z.string().uuid(),
+      }),
+      execute: async ({ eventId }) => {
+        await db.delete(events).where(eq(events.id, eventId));
+        return { deleted: true, eventId };
       },
     }),
 
@@ -1026,6 +1218,175 @@ Stage transitions auto-set timestamps (started_at, hardened_at, transplanted_at)
           growthHabit: entry.growthHabit,
           notes: entry.notes,
         };
+      },
+    }),
+
+    updateCatalogEntry: tool({
+      description: "Update a catalog entry's growing data, vendor, or notes",
+      parameters: z.object({
+        catalogId: z.string().uuid(),
+        vendor: z.string().optional(),
+        sourceType: SourceType.optional(),
+        daysToMaturity: z.number().int().optional(),
+        startIndoorsWeeks: z.number().int().optional(),
+        minNightTemp: z.number().int().optional(),
+        spacingInches: z.number().int().optional(),
+        plantsPerSquare: z.number().int().optional(),
+        sun: z
+          .enum(["full_sun", "partial_sun", "partial_shade", "full_shade"])
+          .optional(),
+        growthHabit: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+      execute: async ({ catalogId, ...updates }) => {
+        const [updated] = await db
+          .update(catalogEntries)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(
+            and(
+              eq(catalogEntries.id, catalogId),
+              eq(catalogEntries.userId, userId),
+            ),
+          )
+          .returning();
+        if (!updated) return { error: "Catalog entry not found" };
+        return {
+          id: updated.id,
+          crop: updated.crop,
+          variety: updated.variety,
+          daysToMaturity: updated.daysToMaturity,
+          startIndoorsWeeks: updated.startIndoorsWeeks,
+        };
+      },
+    }),
+
+    deleteCatalogEntry: tool({
+      description:
+        "Delete a catalog entry. Only call after user confirms. Plantings linked to it will be unlinked.",
+      parameters: z.object({
+        catalogId: z.string().uuid(),
+      }),
+      execute: async ({ catalogId }) => {
+        // Unlink plantings
+        await db
+          .update(plantings)
+          .set({ catalogId: null, updatedAt: new Date() })
+          .where(eq(plantings.catalogId, catalogId));
+        await db
+          .delete(catalogEntries)
+          .where(
+            and(
+              eq(catalogEntries.id, catalogId),
+              eq(catalogEntries.userId, userId),
+            ),
+          );
+        return { deleted: true, catalogId };
+      },
+    }),
+
+    // ── Catalog Reviews ─────────────────────────────────────────────────
+
+    createCatalogReview: tool({
+      description:
+        "Add a review/rating for a catalog variety after growing it in a season",
+      parameters: z.object({
+        catalogId: z.string().uuid(),
+        seasonId: z.string().uuid(),
+        plantingId: z.string().uuid().optional(),
+        rating: z
+          .number()
+          .int()
+          .min(1)
+          .max(5)
+          .optional()
+          .describe("1-5 star rating"),
+        yieldNotes: z.string().optional(),
+        wouldGrowAgain: z
+          .number()
+          .int()
+          .min(0)
+          .max(1)
+          .optional()
+          .describe("1 = yes, 0 = no"),
+        review: z.string().optional(),
+      }),
+      execute: async (params) => {
+        const [existing] = await db
+          .select()
+          .from(catalogReviews)
+          .where(
+            and(
+              eq(catalogReviews.catalogId, params.catalogId),
+              eq(catalogReviews.seasonId, params.seasonId),
+            ),
+          );
+        if (existing) {
+          const [updated] = await db
+            .update(catalogReviews)
+            .set({
+              rating: params.rating ?? existing.rating,
+              yieldNotes: params.yieldNotes ?? existing.yieldNotes,
+              wouldGrowAgain: params.wouldGrowAgain ?? existing.wouldGrowAgain,
+              review: params.review ?? existing.review,
+              plantingId: params.plantingId ?? existing.plantingId,
+            })
+            .where(eq(catalogReviews.id, existing.id))
+            .returning();
+          return {
+            id: updated.id,
+            rating: updated.rating,
+            review: updated.review,
+            alreadyExisted: true,
+          };
+        }
+        const [created] = await db
+          .insert(catalogReviews)
+          .values(params)
+          .returning();
+        return {
+          id: created.id,
+          rating: created.rating,
+          review: created.review,
+        };
+      },
+    }),
+
+    listCatalogReviews: tool({
+      description: "List reviews for a catalog entry across seasons",
+      parameters: z.object({
+        catalogId: z.string().uuid(),
+      }),
+      execute: async ({ catalogId }) => {
+        const rows = await db
+          .select({
+            id: catalogReviews.id,
+            seasonName: seasons.name,
+            seasonYear: seasons.year,
+            rating: catalogReviews.rating,
+            yieldNotes: catalogReviews.yieldNotes,
+            wouldGrowAgain: catalogReviews.wouldGrowAgain,
+            review: catalogReviews.review,
+            createdAt: catalogReviews.createdAt,
+          })
+          .from(catalogReviews)
+          .innerJoin(seasons, eq(catalogReviews.seasonId, seasons.id))
+          .where(eq(catalogReviews.catalogId, catalogId))
+          .orderBy(desc(catalogReviews.createdAt));
+        return rows.map((r) => ({
+          ...r,
+          createdAt: r.createdAt.toISOString(),
+        }));
+      },
+    }),
+
+    deleteCatalogReview: tool({
+      description: "Delete a catalog review",
+      parameters: z.object({
+        reviewId: z.string().uuid(),
+      }),
+      execute: async ({ reviewId }) => {
+        await db.delete(catalogReviews).where(eq(catalogReviews.id, reviewId));
+        return { deleted: true, reviewId };
       },
     }),
 

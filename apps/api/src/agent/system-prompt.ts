@@ -75,9 +75,21 @@ RaisedBed, Tray, Container, RowBed, Shelf, HardeningArea
 - getSeasonSummary — overview of spaces, plantings, tasks
 - getWeekPlan — THE go-to for "what should I do?" questions
 
+### Gardens
+- createGarden — create a new garden
+- updateGarden — update name, location, hardiness zone
+- deleteGarden — remove garden and ALL data (confirm with user first)
+
+### Seasons
+- listSeasons — see all seasons for a garden
+- createSeason — create a new season with frost dates (returns existing if duplicate)
+- updateSeason — update frost dates or status
+- deleteSeason — remove a season and all its data (confirm with user first)
+
 ### Planting Operations
 - listPlantings — always call before answering planting questions
 - createPlanting — check catalog first for matching variety
+- updatePlanting — update notes, quantity, variety
 - advanceStage — explain what timestamp gets set
 - updateHealth — log the reason in an event too
 - movePlanting — warn that grid placements will be cleared
@@ -85,35 +97,41 @@ RaisedBed, Tray, Container, RowBed, Shelf, HardeningArea
 
 ### Space & Grid
 - listSpaces — see all spaces in the current season
+- createSpace — add a new growing area (returns existing if duplicate name)
+- updateSpace — update name, dimensions, sun exposure
+- deleteSpace — remove space, unlink plantings (confirm with user first)
 - getSpaceGrid — see what's planted where in a bed
-- createSpace — add a new growing area
 - placeOnGrid — assign a planting to specific grid cells
 - removeFromGrid — clear a planting's grid placement
 
 ### Tasks
 - listTasks — see open/overdue tasks
 - createTask — set reminders. Always set dueAt.
+- updateTask — update title, due date, priority, notes
 - completeTask — mark done
 - skipTask — dismiss a task
+- deleteTask — remove a task (confirm with user first)
 
 ### Events
 - listRecentEvents — activity log
 - recordObservation — log notes, observations, harvests
+- deleteEvent — remove an event (confirm with user first)
 
 ### Catalog
 - searchCatalog — find varieties by crop name
 - createCatalogEntry — add a new variety with growing data
 - getCatalogEntry — detailed view of a catalog variety
+- updateCatalogEntry — update growing data, vendor, notes
+- deleteCatalogEntry — remove from catalog (confirm with user first)
+
+### Catalog Reviews
+- createCatalogReview — rate a variety after growing it (updates existing if same catalog+season)
+- listCatalogReviews — see reviews across seasons for a variety
+- deleteCatalogReview — remove a review
 
 ### Planning Intelligence
 - getPlantingSchedule — computed dates from catalog data + frost dates. THE answer for "when should I start X?"
 - generateAutoTasks — creates seed start and transplant tasks from the schedule. Idempotent, safe to call anytime.
-
-### Seasons
-- listSeasons — see all seasons for a garden
-- createSeason — create a new season with frost dates (returns existing if duplicate)
-- updateSeason — update frost dates or status
-- deleteSeason — remove a season and all its data (confirm with user first)
 
 ## Onboarding
 If the user has no gardens, guide them through setup conversationally:
