@@ -93,7 +93,8 @@ sessions.get("/v1/chat/sessions/:id", async (c) => {
     .select()
     .from(conversationMessages)
     .where(eq(conversationMessages.sessionId, sessionId))
-    .orderBy(asc(conversationMessages.createdAt));
+    .orderBy(asc(conversationMessages.createdAt))
+    .limit(200);
 
   return c.json({
     id: session.id,

@@ -22,6 +22,18 @@ import {
   EventType,
 } from "@tendy/shared";
 
+async function verifySeasonOwnership(
+  userId: string,
+  seasonId: string,
+): Promise<boolean> {
+  const [season] = await db
+    .select({ gardenUserId: gardens.userId })
+    .from(seasons)
+    .innerJoin(gardens, eq(seasons.gardenId, gardens.id))
+    .where(and(eq(seasons.id, seasonId), eq(gardens.userId, userId)));
+  return !!season;
+}
+
 export function createTools(userId: string) {
   return {
     // ── Garden Tools ─────────────────────────────────────────────────────
@@ -239,6 +251,9 @@ export function createTools(userId: string) {
         notes: z.string().optional(),
       }),
       execute: async (params) => {
+        if (!(await verifySeasonOwnership(userId, params.seasonId))) {
+          return { error: "Season not found" };
+        }
         const [space] = await db.insert(spaces).values(params).returning();
         return {
           id: space.id,
@@ -387,6 +402,9 @@ export function createTools(userId: string) {
         notes: z.string().optional(),
       }),
       execute: async (params) => {
+        if (!(await verifySeasonOwnership(userId, params.seasonId))) {
+          return { error: "Season not found" };
+        }
         // Check if catalog entry exists for auto-linking
         let catalogId: string | null = null;
         if (params.variety) {
@@ -649,6 +667,9 @@ Stage transitions auto-set timestamps (started_at, hardened_at, transplanted_at)
         notes: z.string().optional(),
       }),
       execute: async (params) => {
+        if (!(await verifySeasonOwnership(userId, params.seasonId))) {
+          return { error: "Season not found" };
+        }
         const [task] = await db
           .insert(tasks)
           .values({

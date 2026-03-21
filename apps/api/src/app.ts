@@ -9,7 +9,9 @@ import { authMiddleware } from "./middleware/auth.js";
 
 export const app = new Hono();
 
-const allowedOrigins = process.env.CORS_ORIGINS?.split(",") ?? ["*"];
+const allowedOrigins = process.env.CORS_ORIGINS?.split(",")
+  .map((o) => o.trim())
+  .filter((o) => o) ?? ["*"];
 app.use("*", logger());
 app.use("*", cors({ origin: allowedOrigins }));
 

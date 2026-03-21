@@ -59,6 +59,9 @@ chat.post("/v1/chat", async (c) => {
         title: message.slice(0, 100),
       })
       .returning();
+    if (!session) {
+      return c.json({ error: "Failed to create session" }, 500);
+    }
     sessionId = session.id;
   }
 
@@ -98,6 +101,9 @@ chat.post("/v1/chat", async (c) => {
     }),
   });
 
+  // Capture sessionId for the async callback (guaranteed non-null at this point)
+  const sid = sessionId;
+
   const result = streamText({
     model: openai("gpt-4o"),
     system: systemPrompt,
@@ -105,25 +111,29 @@ chat.post("/v1/chat", async (c) => {
     tools,
     maxSteps: 8,
     onFinish: async ({ text }) => {
-      // Save assistant response
-      if (text) {
-        await db.insert(conversationMessages).values({
-          sessionId: sessionId!,
-          role: "assistant",
-          content: text,
-        });
-      }
+      try {
+        // Save assistant response
+        if (text && text.trim()) {
+          await db.insert(conversationMessages).values({
+            sessionId: sid,
+            role: "assistant",
+            content: text,
+          });
+        }
 
-      // Update session timestamp
-      await db
-        .update(conversationSessions)
-        .set({ lastMessageAt: new Date() })
-        .where(eq(conversationSessions.id, sessionId!));
+        // Update session timestamp
+        await db
+          .update(conversationSessions)
+          .set({ lastMessageAt: new Date() })
+          .where(eq(conversationSessions.id, sid));
+      } catch (err) {
+        console.error("Failed to persist chat response:", err);
+      }
     },
   });
 
   // Return the response with session ID in header
   const response = result.toDataStreamResponse();
-  response.headers.set("X-Session-Id", sessionId);
+  response.headers.set("X-Session-Id", sid);
   return response;
 });
