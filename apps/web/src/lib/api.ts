@@ -136,14 +136,30 @@ export async function sendMessage(
   message: string,
   sessionId?: string,
 ): Promise<{ response: Response; sessionId: string }> {
-  const res = await apiFetch("/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, sessionId }),
-  });
+  let res: Response;
+  try {
+    res = await apiFetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, sessionId }),
+    });
+  } catch {
+    throw new Error(
+      "Unable to reach the server. Check that the API is running.",
+    );
+  }
   if (!res.ok) {
-    const body = await res.json();
-    throw new Error(body.error || "Chat request failed");
+    let errorMsg = `Server error (${res.status})`;
+    try {
+      const body = await res.json();
+      errorMsg = body.error || errorMsg;
+    } catch {
+      // response wasn't JSON
+    }
+    if (res.status === 429) {
+      errorMsg = "You're sending messages too quickly. Please wait a moment and try again.";
+    }
+    throw new Error(errorMsg);
   }
   const sid = res.headers.get("X-Session-Id") || sessionId || "";
   return { response: res, sessionId: sid };
@@ -163,108 +179,139 @@ export async function parseStream(
   onChunk: (text: string) => void,
   onDebug?: (event: DebugEvent) => void,
 ): Promise<string> {
-  const reader = response.body!.getReader();
+  if (!response.body) {
+    throw new Error("No response body");
+  }
+
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
   let buffer = "";
+  let streamError: string | null = null;
 
   // Track tool calls being built up
   const pendingToolCalls = new Map<string, { name: string; args: string }>();
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop()!;
+      const lines = buffer.split("\n");
+      buffer = lines.pop()!;
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
+      for (const line of lines) {
+        if (!line.trim()) continue;
 
-      const colonIdx = line.indexOf(":");
-      if (colonIdx === -1) continue;
-      const typeCode = line.slice(0, colonIdx);
-      const payload = line.slice(colonIdx + 1);
+        const colonIdx = line.indexOf(":");
+        if (colonIdx === -1) continue;
+        const typeCode = line.slice(0, colonIdx);
+        const payload = line.slice(colonIdx + 1);
 
-      try {
-        switch (typeCode) {
-          case "0": {
-            // Text content
-            const text = JSON.parse(payload);
-            fullText += text;
-            onChunk(fullText);
-            break;
-          }
-          case "9": {
-            // Tool call start: {"toolCallId":"...","toolName":"..."}
-            const data = JSON.parse(payload);
-            pendingToolCalls.set(data.toolCallId, {
-              name: data.toolName,
-              args: "",
-            });
-            onDebug?.({
-              timestamp: Date.now(),
-              type: "tool_call",
-              toolName: data.toolName,
-              content: `Calling ${data.toolName}...`,
-            });
-            break;
-          }
-          case "a": {
-            // Tool call delta (args streaming): {"toolCallId":"...","argsTextDelta":"..."}
-            const data = JSON.parse(payload);
-            const pending = pendingToolCalls.get(data.toolCallId);
-            if (pending) {
-              pending.args += data.argsTextDelta;
+        try {
+          switch (typeCode) {
+            case "0": {
+              // Text content
+              const text = JSON.parse(payload);
+              fullText += text;
+              onChunk(fullText);
+              break;
             }
-            break;
-          }
-          case "b": {
-            // Tool result: {"toolCallId":"...","result":...}
-            const data = JSON.parse(payload);
-            const call = pendingToolCalls.get(data.toolCallId);
-            let parsedArgs: unknown = null;
-            try {
-              parsedArgs = call ? JSON.parse(call.args) : null;
-            } catch {
-              parsedArgs = call?.args;
+            case "3": {
+              // Error from AI SDK
+              const errorMsg = JSON.parse(payload);
+              streamError = typeof errorMsg === "string" ? errorMsg : JSON.stringify(errorMsg);
+              onDebug?.({
+                timestamp: Date.now(),
+                type: "raw",
+                content: `ERROR: ${streamError}`,
+              });
+              break;
             }
-            onDebug?.({
-              timestamp: Date.now(),
-              type: "tool_result",
-              toolName: call?.name ?? "unknown",
-              args: parsedArgs,
-              result: data.result,
-            });
-            pendingToolCalls.delete(data.toolCallId);
-            break;
+            case "9": {
+              // Tool call start
+              const data = JSON.parse(payload);
+              pendingToolCalls.set(data.toolCallId, {
+                name: data.toolName,
+                args: "",
+              });
+              onDebug?.({
+                timestamp: Date.now(),
+                type: "tool_call",
+                toolName: data.toolName,
+                content: `Calling ${data.toolName}...`,
+              });
+              break;
+            }
+            case "a": {
+              // Tool call delta (args streaming)
+              const data = JSON.parse(payload);
+              const pending = pendingToolCalls.get(data.toolCallId);
+              if (pending) {
+                pending.args += data.argsTextDelta;
+              }
+              break;
+            }
+            case "b": {
+              // Tool result
+              const data = JSON.parse(payload);
+              const call = pendingToolCalls.get(data.toolCallId);
+              let parsedArgs: unknown = null;
+              try {
+                parsedArgs = call ? JSON.parse(call.args) : null;
+              } catch {
+                parsedArgs = call?.args;
+              }
+              onDebug?.({
+                timestamp: Date.now(),
+                type: "tool_result",
+                toolName: call?.name ?? "unknown",
+                args: parsedArgs,
+                result: data.result,
+              });
+              pendingToolCalls.delete(data.toolCallId);
+              break;
+            }
+            case "e": {
+              // Step finish
+              const data = JSON.parse(payload);
+              onDebug?.({
+                timestamp: Date.now(),
+                type: "step_finish",
+                content: `Step finished: ${data.finishReason ?? "unknown"}`,
+              });
+              break;
+            }
+            default: {
+              onDebug?.({
+                timestamp: Date.now(),
+                type: "raw",
+                content: line,
+              });
+              break;
+            }
           }
-          case "e": {
-            // Step finish
-            const data = JSON.parse(payload);
-            onDebug?.({
-              timestamp: Date.now(),
-              type: "step_finish",
-              content: `Step finished: ${data.finishReason ?? "unknown"}`,
-            });
-            break;
-          }
-          default: {
-            // Log unknown events for debugging
-            onDebug?.({
-              timestamp: Date.now(),
-              type: "raw",
-              content: line,
-            });
-            break;
-          }
+        } catch {
+          // Skip unparseable lines
         }
-      } catch {
-        // Skip unparseable lines
       }
     }
+  } catch (err) {
+    // Network error or stream interrupted
+    if (!fullText) {
+      throw new Error(
+        err instanceof Error
+          ? `Connection lost: ${err.message}`
+          : "Connection lost while streaming response",
+      );
+    }
+    // If we already have some text, return what we got
+  }
+
+  if (streamError && !fullText) {
+    throw new Error(streamError);
   }
 
   return fullText;

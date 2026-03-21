@@ -149,14 +149,30 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
         },
       );
 
+      // Check if we got an empty response (stream completed but no text)
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last.role === "assistant" && !last.content && !last.richDisplays?.length) {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...last,
+            content: "I wasn't able to generate a response. This might be due to a configuration issue (like a missing API key) or a temporary problem. Please try again.",
+            failed: true,
+          };
+          return updated;
+        }
+        return prev;
+      });
+
       // Refresh sessions list
       loadSessions();
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
           role: "assistant",
-          content: `Sorry, something went wrong: ${err instanceof Error ? err.message : "Unknown error"}`,
+          content: `Something went wrong: ${errorMsg}. You can try again or start a new conversation.`,
           failed: true,
         };
         return updated;
