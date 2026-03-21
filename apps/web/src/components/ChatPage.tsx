@@ -54,8 +54,22 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
   }, [debugEvents]);
 
   useEffect(() => {
-    loadSessions();
+    loadSessionsAndResume();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadSessionsAndResume() {
+    try {
+      const s = await getSessions();
+      setSessions(s);
+      // Auto-resume most recent session so it feels like a permanent chat
+      if (s.length > 0 && !currentSessionId) {
+        await loadSession(s[0].id);
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   async function loadSessions() {
     try {
