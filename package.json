@@ -7,7 +7,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "docker compose up -d db && pnpm --filter @tendy/api db:migrate && turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck"
