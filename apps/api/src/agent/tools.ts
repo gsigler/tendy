@@ -398,6 +398,8 @@ export function createTools(userId: string) {
           type: s.type,
           width: s.width,
           length: s.length,
+          posX: s.posX,
+          posY: s.posY,
           sunExposure: s.sunExposure,
         }));
       },
@@ -416,6 +418,8 @@ export function createTools(userId: string) {
         sunExposure: z
           .enum(["full_sun", "partial_sun", "partial_shade", "full_shade"])
           .optional(),
+        posX: z.number().int().optional().describe("X position on garden map (ft from left edge)"),
+        posY: z.number().int().optional().describe("Y position on garden map (ft from top edge)"),
         notes: z.string().optional(),
       }),
       execute: async (params) => {
@@ -439,6 +443,8 @@ export function createTools(userId: string) {
             type: existing.type,
             width: existing.width,
             length: existing.length,
+            posX: existing.posX,
+            posY: existing.posY,
             alreadyExisted: true,
           };
         }
@@ -449,18 +455,22 @@ export function createTools(userId: string) {
           type: space.type,
           width: space.width,
           length: space.length,
+          posX: space.posX,
+          posY: space.posY,
         };
       },
     }),
 
     updateSpace: tool({
-      description: "Update a space's name, dimensions, sun exposure, or notes",
+      description: "Update a space's name, dimensions, position, sun exposure, or notes",
       parameters: z.object({
         spaceId: z.string().uuid(),
         name: z.string().optional(),
         type: SpaceType.optional(),
         width: z.number().int().optional(),
         length: z.number().int().optional(),
+        posX: z.number().int().optional().describe("X position on garden map (ft from left edge)"),
+        posY: z.number().int().optional().describe("Y position on garden map (ft from top edge)"),
         sunExposure: z
           .enum(["full_sun", "partial_sun", "partial_shade", "full_shade"])
           .optional(),
@@ -785,6 +795,8 @@ Use this for a bird's-eye view of the entire garden layout.`,
           width: space.width,
           length: space.length,
           unit: space.unit,
+          posX: space.posX,
+          posY: space.posY,
           plantings: (bySpace.get(space.id) || []).map((p) => ({
             id: p.id,
             crop: p.crop,
@@ -794,11 +806,14 @@ Use this for a bird's-eye view of the entire garden layout.`,
           })),
         }));
 
+        const hasPositions = spaceList.some(s => s.posX != null && s.posY != null);
+
         return {
           _displayType: "garden_map",
           ascii,
           seasonName: season.name,
           seasonYear: season.year,
+          hasPositions,
           spaces: spacesData,
           unassigned: unassigned.map((p) => ({
             id: p.id,

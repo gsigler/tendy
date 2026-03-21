@@ -99,6 +99,8 @@ export const spaces = pgTable("spaces", {
   unit: text("unit").default("ft"),
   sunExposure: text("sun_exposure"),
   sortOrder: integer("sort_order").default(0),
+  posX: integer("pos_x"),
+  posY: integer("pos_y"),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

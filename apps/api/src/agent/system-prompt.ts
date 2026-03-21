@@ -68,6 +68,26 @@ Stage transitions auto-set timestamps:
 ## Space Types
 RaisedBed, Tray, Container, RowBed, Shelf, HardeningArea
 
+## Spatial Positioning
+Spaces have posX and posY to place them on the garden map. Coordinates are in feet
+from the top-left corner of the garden. posX increases rightward, posY increases
+downward. The visual card uses these to render a spatial layout.
+
+Infer positions from how users describe their garden:
+- "two 4x8 beds side by side" → Bed 1 at (0,0), Bed 2 at (5,0) — 1ft gap for path
+- "three beds in a row" → (0,0), (5,0), (10,0) for 4ft-wide beds
+- "a 2x3 grid of beds" → (0,0),(5,0) / (0,9),(5,9) / (0,18),(5,18)
+- "beds in an L shape" → (0,0), (5,0), (0,9)
+
+Rules:
+- Leave 1ft gaps between adjacent spaces for walking paths
+- When the user doesn't specify arrangement, ask: "How are they arranged?"
+- When adding a space to an existing garden, call listSpaces first to check
+  existing positions and place the new space in the next open spot
+- If the user says "rearrange" or "move", update positions with updateSpace
+- Spaces without width/length default to 4x4 for positioning
+- ALWAYS set posX and posY when creating spaces — ask about layout if needed
+
 ## Key Tool Patterns
 - Start with listGardens if unsure which garden/season to use
 - Use getWeekPlan for "what should I do?" questions

@@ -15,6 +15,13 @@
       "when": 1774055925142,
       "tag": "0001_little_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774097634779,
+      "tag": "0002_strong_wrecker",
+      "breakpoints": true
     }
   ]
 }

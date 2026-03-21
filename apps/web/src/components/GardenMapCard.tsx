@@ -13,12 +13,15 @@ interface SpaceItem {
   width: number | null;
   length: number | null;
   unit: string | null;
+  posX: number | null;
+  posY: number | null;
   plantings: PlantingItem[];
 }
 
 interface GardenMapData {
   seasonName: string;
   seasonYear: number;
+  hasPositions?: boolean;
   spaces: SpaceItem[];
   unassigned: PlantingItem[];
   spaceCount: number;
@@ -65,8 +68,144 @@ function spaceTypeIcon(type: string) {
   }
 }
 
+function SpaceCard({ space, style }: { space: SpaceItem; style?: React.CSSProperties }) {
+  const dims = space.width && space.length
+    ? `${space.width}×${space.length}${space.unit || "ft"}`
+    : "";
+
+  return (
+    <div
+      className="bg-white/[0.04] border border-white/[0.08] rounded-lg p-3 flex flex-col"
+      style={style}
+    >
+      {/* Space header */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base">{spaceTypeIcon(space.type)}</span>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-semibold text-emerald-100 truncate">
+            {space.name}
+          </div>
+          <div className="text-[10px] text-emerald-300/40">
+            {space.type}{dims ? ` ${dims}` : ""}
+          </div>
+        </div>
+        <div className="text-[10px] text-emerald-300/30 shrink-0">
+          {space.plantings.length} plant
+          {space.plantings.length !== 1 ? "s" : ""}
+        </div>
+      </div>
+
+      {/* Plantings list */}
+      {space.plantings.length === 0 ? (
+        <div className="text-xs text-emerald-300/20 italic py-1">
+          Empty
+        </div>
+      ) : (
+        <div className="space-y-1 overflow-hidden flex-1">
+          {space.plantings.map((p) => {
+            const h = healthIcon(p.health);
+            return (
+              <div
+                key={p.id}
+                className="flex items-center gap-2 text-xs"
+              >
+                <span className={`${h.color} text-[10px]`}>
+                  {h.icon}
+                </span>
+                <span className="text-emerald-200/80 flex-1 truncate">
+                  {p.variety
+                    ? `${p.crop} (${p.variety})`
+                    : p.crop}
+                </span>
+                <span className="text-emerald-300/30 text-[10px]">
+                  {stageLabel(p.stage)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpatialLayout({ spaces }: { spaces: SpaceItem[] }) {
+  const positioned = spaces.filter(
+    (s) => s.posX != null && s.posY != null,
+  );
+  const unpositioned = spaces.filter(
+    (s) => s.posX == null || s.posY == null,
+  );
+
+  if (positioned.length === 0) return null;
+
+  // Compute bounding box
+  const maxX = Math.max(
+    ...positioned.map((s) => (s.posX ?? 0) + (s.width ?? 4)),
+  );
+  const maxY = Math.max(
+    ...positioned.map((s) => (s.posY ?? 0) + (s.length ?? 4)),
+  );
+
+  // Scale to fit within container (max ~580px wide, reasonable height)
+  const maxWidth = 580;
+  const maxHeight = 500;
+  const scale = Math.min(maxWidth / maxX, maxHeight / maxY, 64);
+  const minCellSize = 100; // minimum space card size in px
+  const effectiveScale = Math.max(scale, minCellSize / Math.min(...positioned.map(s => Math.min(s.width ?? 4, s.length ?? 4))));
+  const finalScale = Math.min(effectiveScale, 64);
+
+  const containerW = maxX * finalScale;
+  const containerH = maxY * finalScale;
+
+  return (
+    <>
+      <div
+        className="relative mx-auto"
+        style={{
+          width: Math.min(containerW, maxWidth),
+          height: containerH * (Math.min(containerW, maxWidth) / containerW),
+        }}
+      >
+        {positioned.map((space) => {
+          const w = space.width ?? 4;
+          const h = space.length ?? 4;
+          const ratio = Math.min(containerW, maxWidth) / containerW;
+          return (
+            <div
+              key={space.id}
+              className="absolute"
+              style={{
+                left: (space.posX ?? 0) * finalScale * ratio,
+                top: (space.posY ?? 0) * finalScale * ratio,
+                width: w * finalScale * ratio - 4,
+                height: h * finalScale * ratio - 4,
+              }}
+            >
+              <SpaceCard
+                space={space}
+                style={{ width: "100%", height: "100%", overflow: "hidden" }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {unpositioned.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-white/[0.06]">
+          <div className="text-xs text-emerald-300/40 mb-2">Not positioned:</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {unpositioned.map((space) => (
+              <SpaceCard key={space.id} space={space} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function GardenMapCard({ data }: { data: GardenMapData }) {
-  const { seasonName, seasonYear, spaces, unassigned, plantingCount } = data;
+  const { seasonName, seasonYear, spaces, unassigned, plantingCount, hasPositions } = data;
 
   return (
     <div className="bg-white/[0.05] border border-white/[0.1] rounded-xl p-4 my-2 max-w-2xl">
@@ -82,66 +221,16 @@ export default function GardenMapCard({ data }: { data: GardenMapData }) {
         </div>
       </div>
 
-      {/* Spaces grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {spaces.map((space) => (
-          <div
-            key={space.id}
-            className="bg-white/[0.04] border border-white/[0.08] rounded-lg p-3"
-          >
-            {/* Space header */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-base">{spaceTypeIcon(space.type)}</span>
-              <div>
-                <div className="text-xs font-semibold text-emerald-100">
-                  {space.name}
-                </div>
-                <div className="text-[10px] text-emerald-300/40">
-                  {space.type}
-                  {space.width && space.length
-                    ? ` ${space.width}×${space.length}${space.unit || "ft"}`
-                    : ""}
-                </div>
-              </div>
-              <div className="ml-auto text-[10px] text-emerald-300/30">
-                {space.plantings.length} plant
-                {space.plantings.length !== 1 ? "s" : ""}
-              </div>
-            </div>
-
-            {/* Plantings list */}
-            {space.plantings.length === 0 ? (
-              <div className="text-xs text-emerald-300/20 italic py-1">
-                Empty
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {space.plantings.map((p) => {
-                  const h = healthIcon(p.health);
-                  return (
-                    <div
-                      key={p.id}
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <span className={`${h.color} text-[10px]`}>
-                        {h.icon}
-                      </span>
-                      <span className="text-emerald-200/80 flex-1 truncate">
-                        {p.variety
-                          ? `${p.crop} (${p.variety})`
-                          : p.crop}
-                      </span>
-                      <span className="text-emerald-300/30 text-[10px]">
-                        {stageLabel(p.stage)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* Spaces — spatial or grid layout */}
+      {hasPositions ? (
+        <SpatialLayout spaces={spaces} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {spaces.map((space) => (
+            <SpaceCard key={space.id} space={space} />
+          ))}
+        </div>
+      )}
 
       {/* Unassigned */}
       {unassigned.length > 0 && (
