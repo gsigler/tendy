@@ -499,4 +499,154 @@ describe("Agent tools", () => {
       expect(gridAfter.placements).toHaveLength(0);
     });
   });
+
+  describe("Planting schedule", () => {
+    it("computes planting dates from catalog data and frost dates", async () => {
+      const garden = await tools.createGarden.execute(
+        { name: "Schedule Garden" },
+        opts,
+      );
+      const season = await tools.createSeason.execute(
+        {
+          gardenId: garden.id,
+          year: 2026,
+          name: "Spring",
+          lastFrostDate: "2026-04-15T00:00:00Z",
+          firstFrostDate: "2026-10-15T00:00:00Z",
+        },
+        opts,
+      );
+
+      // Create catalog entry with timing data
+      await tools.createCatalogEntry.execute(
+        {
+          crop: "Tomato",
+          variety: "Sun Gold",
+          daysToMaturity: 65,
+          startIndoorsWeeks: 6,
+          minNightTemp: 50,
+        },
+        opts,
+      );
+
+      // Create planting linked to catalog (auto-links by crop+variety)
+      await tools.createPlanting.execute(
+        { seasonId: season.id, crop: "Tomato", variety: "Sun Gold" },
+        opts,
+      );
+
+      const schedule = await tools.getPlantingSchedule.execute(
+        { seasonId: season.id },
+        opts,
+      );
+
+      expect(schedule.lastFrostDate).toBe("2026-04-15");
+      expect(schedule.schedule).toHaveLength(1);
+
+      const entry = schedule.schedule[0];
+      expect(entry.crop).toBe("Tomato");
+      expect(entry.hasCatalogData).toBe(true);
+      expect(entry.dates.startIndoors).toBe("2026-03-04"); // 6 weeks before April 15
+      expect(entry.dates.transplant).toBeTruthy();
+      expect(entry.dates.estimatedHarvest).toBeTruthy();
+    });
+
+    it("returns error when no frost date is set", async () => {
+      const garden = await tools.createGarden.execute(
+        { name: "No Frost Garden" },
+        opts,
+      );
+      const season = await tools.createSeason.execute(
+        { gardenId: garden.id, year: 2026, name: "Spring" },
+        opts,
+      );
+
+      const result = await tools.getPlantingSchedule.execute(
+        { seasonId: season.id },
+        opts,
+      );
+      expect(result).toHaveProperty("error");
+    });
+  });
+
+  describe("Auto task generation", () => {
+    it("generates seed start and transplant tasks from catalog data", async () => {
+      const garden = await tools.createGarden.execute(
+        { name: "Auto Task Garden" },
+        opts,
+      );
+      const season = await tools.createSeason.execute(
+        {
+          gardenId: garden.id,
+          year: 2026,
+          name: "Spring",
+          lastFrostDate: "2026-04-15T00:00:00Z",
+        },
+        opts,
+      );
+
+      await tools.createCatalogEntry.execute(
+        {
+          crop: "Pepper",
+          variety: "Bell",
+          startIndoorsWeeks: 8,
+          daysToMaturity: 70,
+          minNightTemp: 55,
+        },
+        opts,
+      );
+
+      await tools.createPlanting.execute(
+        { seasonId: season.id, crop: "Pepper", variety: "Bell", sourceType: "seed" },
+        opts,
+      );
+
+      const result = await tools.generateAutoTasks.execute(
+        { seasonId: season.id },
+        opts,
+      );
+
+      expect(result.created).toBe(2); // seed_start + transplant
+      expect(result.tasks.some((t) => t.type === "seed_start")).toBe(true);
+      expect(result.tasks.some((t) => t.type === "transplant")).toBe(true);
+    });
+
+    it("is idempotent — does not duplicate tasks", async () => {
+      const garden = await tools.createGarden.execute(
+        { name: "Idempotent Garden" },
+        opts,
+      );
+      const season = await tools.createSeason.execute(
+        {
+          gardenId: garden.id,
+          year: 2026,
+          name: "Spring",
+          lastFrostDate: "2026-04-15T00:00:00Z",
+        },
+        opts,
+      );
+
+      await tools.createCatalogEntry.execute(
+        { crop: "Tomato", variety: "Roma", startIndoorsWeeks: 6 },
+        opts,
+      );
+
+      await tools.createPlanting.execute(
+        { seasonId: season.id, crop: "Tomato", variety: "Roma", sourceType: "seed" },
+        opts,
+      );
+
+      const first = await tools.generateAutoTasks.execute(
+        { seasonId: season.id },
+        opts,
+      );
+      expect(first.created).toBe(2);
+
+      const second = await tools.generateAutoTasks.execute(
+        { seasonId: season.id },
+        opts,
+      );
+      expect(second.created).toBe(0);
+    });
+  });
 });
