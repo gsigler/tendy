@@ -231,7 +231,51 @@ export async function parseStream(
               break;
             }
             case "9": {
-              // Tool call start
+              // Tool call (complete with toolCallId, toolName, args)
+              const data = JSON.parse(payload);
+              pendingToolCalls.set(data.toolCallId, {
+                name: data.toolName,
+                args: typeof data.args === "string" ? data.args : JSON.stringify(data.args),
+              });
+              onDebug?.({
+                timestamp: Date.now(),
+                type: "tool_call",
+                toolName: data.toolName,
+                content: `Calling ${data.toolName}...`,
+              });
+              break;
+            }
+            case "a": {
+              // Tool result (toolCallId, result)
+              const data = JSON.parse(payload);
+              const call = pendingToolCalls.get(data.toolCallId);
+              // Parse result if it's a JSON string
+              let parsedResult = data.result;
+              if (typeof parsedResult === "string") {
+                try {
+                  parsedResult = JSON.parse(parsedResult);
+                } catch {
+                  // Keep as string if not valid JSON
+                }
+              }
+              let parsedArgs: unknown = null;
+              try {
+                parsedArgs = call ? JSON.parse(call.args) : null;
+              } catch {
+                parsedArgs = call?.args;
+              }
+              onDebug?.({
+                timestamp: Date.now(),
+                type: "tool_result",
+                toolName: call?.name ?? "unknown",
+                args: parsedArgs,
+                result: parsedResult,
+              });
+              pendingToolCalls.delete(data.toolCallId);
+              break;
+            }
+            case "b": {
+              // Tool call streaming start (toolCallId, toolName)
               const data = JSON.parse(payload);
               pendingToolCalls.set(data.toolCallId, {
                 name: data.toolName,
@@ -245,42 +289,13 @@ export async function parseStream(
               });
               break;
             }
-            case "a": {
+            case "c": {
               // Tool call delta (args streaming)
               const data = JSON.parse(payload);
               const pending = pendingToolCalls.get(data.toolCallId);
               if (pending) {
                 pending.args += data.argsTextDelta;
               }
-              break;
-            }
-            case "b": {
-              // Tool result
-              const data = JSON.parse(payload);
-              const call = pendingToolCalls.get(data.toolCallId);
-              let parsedArgs: unknown = null;
-              try {
-                parsedArgs = call ? JSON.parse(call.args) : null;
-              } catch {
-                parsedArgs = call?.args;
-              }
-              // Parse result if it's a JSON string (AI SDK sends stringified tool results)
-              let parsedResult = data.result;
-              if (typeof parsedResult === "string") {
-                try {
-                  parsedResult = JSON.parse(parsedResult);
-                } catch {
-                  // Keep as string if not valid JSON
-                }
-              }
-              onDebug?.({
-                timestamp: Date.now(),
-                type: "tool_result",
-                toolName: call?.name ?? "unknown",
-                args: parsedArgs,
-                result: parsedResult,
-              });
-              pendingToolCalls.delete(data.toolCallId);
               break;
             }
             case "e": {
