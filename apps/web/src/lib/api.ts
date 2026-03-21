@@ -264,12 +264,21 @@ export async function parseStream(
               } catch {
                 parsedArgs = call?.args;
               }
+              // Parse result if it's a JSON string (AI SDK sends stringified tool results)
+              let parsedResult = data.result;
+              if (typeof parsedResult === "string") {
+                try {
+                  parsedResult = JSON.parse(parsedResult);
+                } catch {
+                  // Keep as string if not valid JSON
+                }
+              }
               onDebug?.({
                 timestamp: Date.now(),
                 type: "tool_result",
                 toolName: call?.name ?? "unknown",
                 args: parsedArgs,
-                result: data.result,
+                result: parsedResult,
               });
               pendingToolCalls.delete(data.toolCallId);
               break;

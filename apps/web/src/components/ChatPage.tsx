@@ -86,7 +86,11 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
       setMessages(
         data.messages
           .filter((m) => m.role === "user" || m.role === "assistant")
-          .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            richDisplays: m.richDisplays as RichDisplay[] | undefined,
+          })),
       );
       setCurrentSessionId(id);
       setSidebarOpen(false);

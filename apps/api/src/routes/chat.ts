@@ -199,14 +199,37 @@ chat.post("/v1/chat", async (c) => {
     messages,
     tools,
     maxSteps: 8,
-    onFinish: async ({ text }) => {
+    onFinish: async ({ text, steps }) => {
       try {
+        // Collect rich display data from tool results
+        const richDisplays: unknown[] = [];
+        for (const step of steps) {
+          for (const result of step.toolResults) {
+            if (
+              result.result &&
+              typeof result.result === "object" &&
+              "_displayType" in (result.result as Record<string, unknown>)
+            ) {
+              richDisplays.push(result.result);
+            }
+          }
+        }
+
         // Save assistant response
         if (text && text.trim()) {
           await db.insert(conversationMessages).values({
             sessionId: sid,
             role: "assistant",
             content: text,
+            toolCallsJson: richDisplays.length > 0 ? richDisplays : undefined,
+          });
+        } else if (richDisplays.length > 0) {
+          // Save even if no text, as long as we have rich displays
+          await db.insert(conversationMessages).values({
+            sessionId: sid,
+            role: "assistant",
+            content: "",
+            toolCallsJson: richDisplays,
           });
         }
 

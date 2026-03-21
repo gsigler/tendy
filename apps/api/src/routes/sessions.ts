@@ -110,6 +110,7 @@ sessions.get("/v1/chat/sessions/:id", async (c) => {
       id: m.id,
       role: m.role,
       content: m.content,
+      richDisplays: m.toolCallsJson ?? undefined,
       createdAt: m.createdAt.toISOString(),
     })),
   });
