@@ -23,7 +23,16 @@ async function apiFetch(
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
-  return fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  // Auto-logout on expired/invalid token
+  if (res.status === 401 && token) {
+    clearToken();
+    localStorage.removeItem("user");
+    window.location.reload();
+  }
+
+  return res;
 }
 
 export interface User {

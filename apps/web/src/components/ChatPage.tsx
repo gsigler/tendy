@@ -13,6 +13,7 @@ import {
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  failed?: boolean;
 }
 
 interface ChatPageProps {
@@ -110,12 +111,29 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
         updated[updated.length - 1] = {
           role: "assistant",
           content: `Sorry, something went wrong: ${err instanceof Error ? err.message : "Unknown error"}`,
+          failed: true,
         };
         return updated;
       });
     } finally {
       setStreaming(false);
     }
+  }
+
+  function handleRetry() {
+    // Remove the failed assistant message and resend the last user message
+    setMessages((prev) => {
+      const withoutFailed = prev.filter((m) => !m.failed);
+      const lastUserMsg = [...withoutFailed].reverse().find((m) => m.role === "user");
+      if (lastUserMsg) {
+        // Remove the last user message too — handleSend will re-add it
+        const withoutLast = withoutFailed.slice(0, -1);
+        setMessages(withoutLast);
+        setInput(lastUserMsg.content);
+        setTimeout(() => handleSend(), 0);
+      }
+      return prev;
+    });
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -282,17 +300,30 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
                   }`}
                 >
                   {msg.role === "assistant" ? (
-                    msg.content ? (
-                      <div className="message-content">
-                        <Markdown>{msg.content}</Markdown>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1 py-1">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out infinite" }} />
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.2s infinite" }} />
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.4s infinite" }} />
-                      </div>
-                    )
+                    <>
+                      {msg.content ? (
+                        <div className="message-content">
+                          <Markdown>{msg.content}</Markdown>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1 py-1">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out infinite" }} />
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.2s infinite" }} />
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.4s infinite" }} />
+                        </div>
+                      )}
+                      {msg.failed && (
+                        <button
+                          onClick={handleRetry}
+                          className="mt-2 text-xs text-red-300 hover:text-red-200 flex items-center gap-1 transition"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                          </svg>
+                          Retry
+                        </button>
+                      )}
+                    </>
                   ) : (
                     msg.content
                   )}
