@@ -541,6 +541,209 @@ export function createTools(userId: string) {
       },
     }),
 
+    drawSpaceGrid: tool({
+      description: `Draw an ASCII art grid of a space showing exactly what is planted in each cell.
+Use this when the user wants to SEE their garden layout visually. Shows crop abbreviations
+in a grid with row/col coordinates. Empty cells show "·". Includes a legend mapping
+abbreviations to full crop names with health status.`,
+      parameters: z.object({
+        spaceId: z.string().uuid(),
+      }),
+      execute: async ({ spaceId }) => {
+        const [space] = await db
+          .select()
+          .from(spaces)
+          .where(eq(spaces.id, spaceId));
+        if (!space) return { error: "Space not found" };
+
+        const width = space.width || 4;
+        const length = space.length || 4;
+
+        const placementRows = await db
+          .select({
+            row: gridPlacements.row,
+            col: gridPlacements.col,
+            plantingId: gridPlacements.plantingId,
+            crop: plantings.crop,
+            variety: plantings.variety,
+            stage: plantings.stage,
+            health: plantings.health,
+          })
+          .from(gridPlacements)
+          .innerJoin(plantings, eq(gridPlacements.plantingId, plantings.id))
+          .where(eq(gridPlacements.spaceId, spaceId));
+
+        // Build abbreviation map: first 3 chars of crop, disambiguate with variety
+        const plantingAbbrevs = new Map<string, string>();
+        const usedAbbrevs = new Set<string>();
+        for (const p of placementRows) {
+          if (plantingAbbrevs.has(p.plantingId)) continue;
+          let abbrev = p.crop.slice(0, 3).toUpperCase();
+          if (usedAbbrevs.has(abbrev) && p.variety) {
+            abbrev = (p.crop[0] + p.variety.slice(0, 2)).toUpperCase();
+          }
+          let attempt = abbrev;
+          let i = 2;
+          while (usedAbbrevs.has(attempt)) {
+            attempt = abbrev.slice(0, 2) + String(i);
+            i++;
+          }
+          usedAbbrevs.add(attempt);
+          plantingAbbrevs.set(p.plantingId, attempt);
+        }
+
+        // Build grid
+        const grid: string[][] = Array.from({ length }, () =>
+          Array.from({ length: width }, () => " · "),
+        );
+        for (const p of placementRows) {
+          const abbrev = plantingAbbrevs.get(p.plantingId) || "???";
+          if (p.row < length && p.col < width) {
+            grid[p.row][p.col] = abbrev.padStart(3);
+          }
+        }
+
+        // Column headers
+        const colHeaders =
+          "    " +
+          Array.from({ length: width }, (_, i) => String(i).padStart(3)).join("");
+        const separator = "   +" + "---".repeat(width) + "+";
+
+        let ascii = `${space.name} (${width}×${length} ${space.unit || "ft"}, ${space.type})\n\n`;
+        ascii += colHeaders + "\n";
+        ascii += separator + "\n";
+        for (let r = 0; r < length; r++) {
+          ascii += String(r).padStart(2) + " |" + grid[r].join("") + " |\n";
+        }
+        ascii += separator + "\n";
+
+        // Legend
+        const legend: string[] = [];
+        const seen = new Set<string>();
+        for (const p of placementRows) {
+          if (seen.has(p.plantingId)) continue;
+          seen.add(p.plantingId);
+          const abbrev = plantingAbbrevs.get(p.plantingId) || "???";
+          const name = p.variety ? `${p.crop} (${p.variety})` : p.crop;
+          const healthIcon =
+            p.health === "healthy" ? "" :
+            p.health === "fair" ? " ⚠" :
+            p.health === "poor" ? " ⚠⚠" :
+            p.health === "critical" ? " 🔴" : " 💀";
+          legend.push(`${abbrev.padStart(3)} = ${name} [${p.stage}]${healthIcon}`);
+        }
+        if (legend.length > 0) {
+          ascii += "\nLegend:\n" + legend.join("\n");
+        }
+
+        // Count empty cells
+        const totalCells = width * length;
+        const usedCells = placementRows.length;
+        ascii += `\n\n${usedCells}/${totalCells} cells occupied`;
+
+        return { ascii, spaceName: space.name, width, length, plantingCount: seen.size };
+      },
+    }),
+
+    drawGardenMap: tool({
+      description: `Draw an ASCII overview of all spaces in a season with their contents.
+Shows each space as a labeled box with a summary of what's planted inside.
+Use this for a bird's-eye view of the entire garden layout.`,
+      parameters: z.object({
+        seasonId: z.string().uuid(),
+      }),
+      execute: async ({ seasonId }) => {
+        const [season] = await db
+          .select()
+          .from(seasons)
+          .where(eq(seasons.id, seasonId));
+        if (!season) return { error: "Season not found" };
+
+        const spaceList = await db
+          .select()
+          .from(spaces)
+          .where(eq(spaces.seasonId, seasonId))
+          .orderBy(asc(spaces.sortOrder));
+
+        if (spaceList.length === 0) {
+          return { ascii: "No spaces set up yet. Create some beds, trays, or containers first." };
+        }
+
+        const plantingList = await db
+          .select({
+            id: plantings.id,
+            crop: plantings.crop,
+            variety: plantings.variety,
+            stage: plantings.stage,
+            health: plantings.health,
+            spaceId: plantings.spaceId,
+          })
+          .from(plantings)
+          .where(eq(plantings.seasonId, seasonId));
+
+        // Group plantings by space
+        const bySpace = new Map<string, typeof plantingList>();
+        const unassigned: typeof plantingList = [];
+        for (const p of plantingList) {
+          if (p.spaceId) {
+            const list = bySpace.get(p.spaceId) || [];
+            list.push(p);
+            bySpace.set(p.spaceId, list);
+          } else {
+            unassigned.push(p);
+          }
+        }
+
+        let ascii = `🌱 ${season.name} (${season.year}) — Garden Map\n`;
+        ascii += "═".repeat(50) + "\n\n";
+
+        for (const space of spaceList) {
+          const dims = space.width && space.length
+            ? ` ${space.width}×${space.length}${space.unit || "ft"}`
+            : "";
+          const header = `${space.name} (${space.type}${dims})`;
+          const border = "─".repeat(Math.max(header.length + 2, 30));
+
+          ascii += `┌${border}┐\n`;
+          ascii += `│ ${header.padEnd(border.length - 1)}│\n`;
+          ascii += `├${border}┤\n`;
+
+          const spacePlantings = bySpace.get(space.id) || [];
+          if (spacePlantings.length === 0) {
+            ascii += `│ ${"(empty)".padEnd(border.length - 1)}│\n`;
+          } else {
+            for (const p of spacePlantings) {
+              const name = p.variety ? `${p.crop} (${p.variety})` : p.crop;
+              const status = `[${p.stage}]`;
+              const healthIcon =
+                p.health === "healthy" ? "●" :
+                p.health === "fair" ? "◐" :
+                p.health === "poor" ? "○" : "✕";
+              const line = ` ${healthIcon} ${name} ${status}`;
+              ascii += `│${line.padEnd(border.length)}│\n`;
+            }
+          }
+          ascii += `└${border}┘\n\n`;
+        }
+
+        if (unassigned.length > 0) {
+          ascii += `📦 Unassigned Plantings:\n`;
+          for (const p of unassigned) {
+            const name = p.variety ? `${p.crop} (${p.variety})` : p.crop;
+            ascii += `  • ${name} [${p.stage}]\n`;
+          }
+          ascii += "\n";
+        }
+
+        ascii += `Total: ${spaceList.length} spaces, ${plantingList.length} plantings`;
+        if (unassigned.length > 0) {
+          ascii += ` (${unassigned.length} unassigned)`;
+        }
+
+        return { ascii, spaceCount: spaceList.length, plantingCount: plantingList.length };
+      },
+    }),
+
     placeOnGrid: tool({
       description: "Assign a planting to specific grid cells in a space",
       parameters: z.object({

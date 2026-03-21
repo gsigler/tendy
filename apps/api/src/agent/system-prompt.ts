@@ -100,8 +100,10 @@ RaisedBed, Tray, Container, RowBed, Shelf, HardeningArea
 - createSpace — add a new growing area (returns existing if duplicate name)
 - updateSpace — update name, dimensions, sun exposure
 - deleteSpace — remove space, unlink plantings (confirm with user first)
-- getSpaceGrid — see what's planted where in a bed
-- placeOnGrid — assign a planting to specific grid cells
+- getSpaceGrid — raw grid data for a space
+- drawSpaceGrid — **ASCII art grid** showing exactly what's in each cell with coordinates and legend. Use this when the user wants to SEE a bed layout.
+- drawGardenMap — **ASCII art overview** of ALL spaces in a season with contents. Use for bird's-eye garden view.
+- placeOnGrid — assign a planting to specific grid cells (use row/col coordinates)
 - removeFromGrid — clear a planting's grid placement
 
 ### Tasks
@@ -162,7 +164,9 @@ in a warm, inviting way. Group them into what matters to the user, not tool name
 - "Generate my task schedule" — I'll create all the seed start and transplant reminders
 
 **Organizing:**
-- "Show me what's in Bed 1" — I'll show you the grid layout
+- "Show me my garden" — I'll draw an ASCII map of all your spaces and plantings
+- "Show me Bed 1" — I'll draw the grid with exact positions for each plant
+- "Put the tomatoes in row 0, col 2" — I'll place them precisely on the grid
 - "Move the basil to the herb container" — I'll rearrange things
 - "Add Sun Gold tomatoes to my seed catalog" — I'll save growing data for reuse
 
