@@ -149,14 +149,27 @@ export async function sendMessage(
   return { response: res, sessionId: sid };
 }
 
+export interface DebugEvent {
+  timestamp: number;
+  type: "tool_call" | "tool_result" | "text" | "step_finish" | "raw";
+  toolName?: string;
+  args?: unknown;
+  result?: unknown;
+  content?: string;
+}
+
 export async function parseStream(
   response: Response,
   onChunk: (text: string) => void,
+  onDebug?: (event: DebugEvent) => void,
 ): Promise<string> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
   let buffer = "";
+
+  // Track tool calls being built up
+  const pendingToolCalls = new Map<string, { name: string; args: string }>();
 
   while (true) {
     const { done, value } = await reader.read();
@@ -164,22 +177,92 @@ export async function parseStream(
 
     buffer += decoder.decode(value, { stream: true });
 
-    // Parse AI SDK data stream format
-    // Lines are formatted as: type:content\n
     const lines = buffer.split("\n");
     buffer = lines.pop()!;
 
     for (const line of lines) {
       if (!line.trim()) continue;
-      // AI SDK format: 0:text for text chunks
-      if (line.startsWith("0:")) {
-        try {
-          const text = JSON.parse(line.slice(2));
-          fullText += text;
-          onChunk(fullText);
-        } catch {
-          // Skip unparseable lines
+
+      const colonIdx = line.indexOf(":");
+      if (colonIdx === -1) continue;
+      const typeCode = line.slice(0, colonIdx);
+      const payload = line.slice(colonIdx + 1);
+
+      try {
+        switch (typeCode) {
+          case "0": {
+            // Text content
+            const text = JSON.parse(payload);
+            fullText += text;
+            onChunk(fullText);
+            break;
+          }
+          case "9": {
+            // Tool call start: {"toolCallId":"...","toolName":"..."}
+            const data = JSON.parse(payload);
+            pendingToolCalls.set(data.toolCallId, {
+              name: data.toolName,
+              args: "",
+            });
+            onDebug?.({
+              timestamp: Date.now(),
+              type: "tool_call",
+              toolName: data.toolName,
+              content: `Calling ${data.toolName}...`,
+            });
+            break;
+          }
+          case "a": {
+            // Tool call delta (args streaming): {"toolCallId":"...","argsTextDelta":"..."}
+            const data = JSON.parse(payload);
+            const pending = pendingToolCalls.get(data.toolCallId);
+            if (pending) {
+              pending.args += data.argsTextDelta;
+            }
+            break;
+          }
+          case "b": {
+            // Tool result: {"toolCallId":"...","result":...}
+            const data = JSON.parse(payload);
+            const call = pendingToolCalls.get(data.toolCallId);
+            let parsedArgs: unknown = null;
+            try {
+              parsedArgs = call ? JSON.parse(call.args) : null;
+            } catch {
+              parsedArgs = call?.args;
+            }
+            onDebug?.({
+              timestamp: Date.now(),
+              type: "tool_result",
+              toolName: call?.name ?? "unknown",
+              args: parsedArgs,
+              result: data.result,
+            });
+            pendingToolCalls.delete(data.toolCallId);
+            break;
+          }
+          case "e": {
+            // Step finish
+            const data = JSON.parse(payload);
+            onDebug?.({
+              timestamp: Date.now(),
+              type: "step_finish",
+              content: `Step finished: ${data.finishReason ?? "unknown"}`,
+            });
+            break;
+          }
+          default: {
+            // Log unknown events for debugging
+            onDebug?.({
+              timestamp: Date.now(),
+              type: "raw",
+              content: line,
+            });
+            break;
+          }
         }
+      } catch {
+        // Skip unparseable lines
       }
     }
   }

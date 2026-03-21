@@ -8,6 +8,7 @@ import {
   logout,
   type Session,
   type User,
+  type DebugEvent,
 } from "../lib/api";
 
 interface ChatMessage {
@@ -28,7 +29,10 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugEvents, setDebugEvents] = useState<DebugEvent[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const debugEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -38,6 +42,10 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    debugEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [debugEvents]);
 
   useEffect(() => {
     loadSessions();
@@ -81,6 +89,7 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setStreaming(true);
+    setDebugEvents([]);
 
     // Add placeholder for assistant
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
@@ -95,13 +104,19 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
         setCurrentSessionId(sessionId);
       }
 
-      await parseStream(response, (chunk) => {
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: "assistant", content: chunk };
-          return updated;
-        });
-      });
+      await parseStream(
+        response,
+        (chunk) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { role: "assistant", content: chunk };
+            return updated;
+          });
+        },
+        (event) => {
+          setDebugEvents((prev) => [...prev, event]);
+        },
+      );
 
       // Refresh sessions list
       loadSessions();
@@ -369,6 +384,117 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
           </div>
         </div>
       </main>
+
+      {/* Debug panel */}
+      {debugOpen && (
+        <aside className="w-96 border-l border-white/[0.08] bg-black/40 backdrop-blur-xl flex flex-col max-h-full overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Debug</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDebugEvents([])}
+                className="text-xs text-emerald-400/50 hover:text-emerald-300 transition"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setDebugOpen(false)}
+                className="text-emerald-400/50 hover:text-white transition"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 font-mono text-xs">
+            {debugEvents.length === 0 && (
+              <div className="text-emerald-400/30 text-center py-8">
+                Send a message to see agent activity
+              </div>
+            )}
+            {debugEvents.map((event, i) => (
+              <div
+                key={i}
+                className={`rounded-lg p-2.5 border ${
+                  event.type === "tool_call"
+                    ? "bg-blue-500/10 border-blue-500/20"
+                    : event.type === "tool_result"
+                      ? "bg-emerald-500/10 border-emerald-500/20"
+                      : event.type === "step_finish"
+                        ? "bg-purple-500/10 border-purple-500/20"
+                        : "bg-white/[0.03] border-white/[0.05]"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider ${
+                      event.type === "tool_call"
+                        ? "text-blue-400"
+                        : event.type === "tool_result"
+                          ? "text-emerald-400"
+                          : event.type === "step_finish"
+                            ? "text-purple-400"
+                            : "text-gray-400"
+                    }`}
+                  >
+                    {event.type === "tool_call"
+                      ? `CALL ${event.toolName}`
+                      : event.type === "tool_result"
+                        ? `RESULT ${event.toolName}`
+                        : event.type}
+                  </span>
+                  <span className="text-[10px] text-emerald-400/30 ml-auto">
+                    {new Date(event.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+                {event.args !== undefined && (
+                  <details className="mt-1">
+                    <summary className="text-blue-300/60 cursor-pointer hover:text-blue-300 text-[11px]">
+                      Arguments
+                    </summary>
+                    <pre className="mt-1 text-blue-200/70 whitespace-pre-wrap break-all leading-relaxed">
+                      {JSON.stringify(event.args, null, 2)}
+                    </pre>
+                  </details>
+                )}
+                {event.result !== undefined && (
+                  <details className="mt-1" open>
+                    <summary className="text-emerald-300/60 cursor-pointer hover:text-emerald-300 text-[11px]">
+                      Result
+                    </summary>
+                    <pre className="mt-1 text-emerald-200/70 whitespace-pre-wrap break-all leading-relaxed">
+                      {JSON.stringify(event.result, null, 2)}
+                    </pre>
+                  </details>
+                )}
+                {event.content && event.args === undefined && event.result === undefined && (
+                  <div className="text-gray-300/70 mt-0.5">{event.content}</div>
+                )}
+              </div>
+            ))}
+            <div ref={debugEndRef} />
+          </div>
+        </aside>
+      )}
+
+      {/* Debug toggle button */}
+      {!debugOpen && (
+        <button
+          onClick={() => setDebugOpen(true)}
+          className="fixed bottom-4 right-4 z-40 p-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 rounded-xl transition shadow-lg backdrop-blur-sm"
+          title="Toggle debug panel"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 12.75c1.148 0 2.278.08 3.383.237 1.037.146 1.866.966 1.866 2.013 0 3.728-2.35 6.75-5.25 6.75S6.75 18.728 6.75 15c0-1.046.83-1.867 1.866-2.013A24.204 24.204 0 0112 12.75zm0 0c2.883 0 5.647.508 8.207 1.44a23.91 23.91 0 01-1.152-6.135 3.001 3.001 0 00-2.36-2.78 11.088 11.088 0 00-9.39 0 3.001 3.001 0 00-2.36 2.78 23.91 23.91 0 01-1.152 6.135A23.864 23.864 0 0112 12.75zM9.75 8.625a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+          </svg>
+          {debugEvents.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-black text-[10px] font-bold rounded-full flex items-center justify-center">
+              {debugEvents.length}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 }
