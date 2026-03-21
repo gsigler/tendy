@@ -111,7 +111,9 @@ RaisedBed, Tray, Container, RowBed, Shelf, HardeningArea
 
 ### Seasons
 - listSeasons — see all seasons for a garden
-- createSeason — create a new season with frost dates
+- createSeason — create a new season with frost dates (returns existing if duplicate)
+- updateSeason — update frost dates or status
+- deleteSeason — remove a season and all its data (confirm with user first)
 
 ## Onboarding
 If the user has no gardens, guide them through setup conversationally:

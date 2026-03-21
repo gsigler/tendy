@@ -106,7 +106,7 @@ export function createTools(userId: string) {
 
     createSeason: tool({
       description:
-        "Create a new season for a garden. Include frost dates if known.",
+        "Create a new season for a garden. Include frost dates if known. Returns existing season if one with the same name and year already exists.",
       parameters: z.object({
         gardenId: z.string().uuid(),
         year: z.number().int(),
@@ -128,6 +128,46 @@ export function createTools(userId: string) {
           .where(and(eq(gardens.id, gardenId), eq(gardens.userId, userId)));
         if (!garden) return { error: "Garden not found" };
 
+        // Check for existing season with same name+year
+        const [existing] = await db
+          .select()
+          .from(seasons)
+          .where(
+            and(
+              eq(seasons.gardenId, gardenId),
+              eq(seasons.year, year),
+              eq(seasons.name, name),
+            ),
+          );
+        if (existing) {
+          // Update frost dates if provided
+          if (lastFrostDate || firstFrostDate) {
+            const [updated] = await db
+              .update(seasons)
+              .set({
+                ...(lastFrostDate ? { lastFrostDate: new Date(lastFrostDate) } : {}),
+                ...(firstFrostDate ? { firstFrostDate: new Date(firstFrostDate) } : {}),
+                updatedAt: new Date(),
+              })
+              .where(eq(seasons.id, existing.id))
+              .returning();
+            return {
+              id: updated.id,
+              year: updated.year,
+              name: updated.name,
+              status: updated.status,
+              alreadyExisted: true,
+            };
+          }
+          return {
+            id: existing.id,
+            year: existing.year,
+            name: existing.name,
+            status: existing.status,
+            alreadyExisted: true,
+          };
+        }
+
         const [season] = await db
           .insert(seasons)
           .values({
@@ -144,6 +184,69 @@ export function createTools(userId: string) {
           name: season.name,
           status: season.status,
         };
+      },
+    }),
+
+    updateSeason: tool({
+      description: "Update a season's frost dates or status",
+      parameters: z.object({
+        seasonId: z.string().uuid(),
+        lastFrostDate: z.string().optional(),
+        firstFrostDate: z.string().optional(),
+        status: z.enum(["planning", "active", "complete"]).optional(),
+      }),
+      execute: async ({ seasonId, lastFrostDate, firstFrostDate, status }) => {
+        if (!(await verifySeasonOwnership(userId, seasonId))) {
+          return { error: "Season not found" };
+        }
+        const [updated] = await db
+          .update(seasons)
+          .set({
+            ...(lastFrostDate ? { lastFrostDate: new Date(lastFrostDate) } : {}),
+            ...(firstFrostDate ? { firstFrostDate: new Date(firstFrostDate) } : {}),
+            ...(status ? { status } : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(seasons.id, seasonId))
+          .returning();
+        if (!updated) return { error: "Season not found" };
+        return {
+          id: updated.id,
+          name: updated.name,
+          status: updated.status,
+          lastFrostDate: updated.lastFrostDate?.toISOString() ?? null,
+          firstFrostDate: updated.firstFrostDate?.toISOString() ?? null,
+        };
+      },
+    }),
+
+    deleteSeason: tool({
+      description:
+        "Delete a season and all its spaces, plantings, tasks, and events. Only call after user confirms.",
+      parameters: z.object({
+        seasonId: z.string().uuid(),
+      }),
+      execute: async ({ seasonId }) => {
+        if (!(await verifySeasonOwnership(userId, seasonId))) {
+          return { error: "Season not found" };
+        }
+        // Delete in FK order
+        const plantingRows = await db
+          .select({ id: plantings.id })
+          .from(plantings)
+          .where(eq(plantings.seasonId, seasonId));
+        const plantingIds = plantingRows.map((p) => p.id);
+        if (plantingIds.length > 0) {
+          for (const pid of plantingIds) {
+            await db.delete(gridPlacements).where(eq(gridPlacements.plantingId, pid));
+          }
+        }
+        await db.delete(events).where(eq(events.seasonId, seasonId));
+        await db.delete(tasks).where(eq(tasks.seasonId, seasonId));
+        await db.delete(plantings).where(eq(plantings.seasonId, seasonId));
+        await db.delete(spaces).where(eq(spaces.seasonId, seasonId));
+        await db.delete(seasons).where(eq(seasons.id, seasonId));
+        return { deleted: true, seasonId };
       },
     }),
 
@@ -237,7 +340,7 @@ export function createTools(userId: string) {
 
     createSpace: tool({
       description:
-        "Create a new growing space. Types: RaisedBed, Tray, Container, RowBed, Shelf, HardeningArea",
+        "Create a new growing space. Returns existing space if one with the same name already exists in the season. Types: RaisedBed, Tray, Container, RowBed, Shelf, HardeningArea",
       parameters: z.object({
         seasonId: z.string().uuid(),
         name: z.string().describe("e.g. 'Sunny Bed', 'Herb Container'"),
@@ -253,6 +356,26 @@ export function createTools(userId: string) {
       execute: async (params) => {
         if (!(await verifySeasonOwnership(userId, params.seasonId))) {
           return { error: "Season not found" };
+        }
+        // Check for existing space with same name
+        const [existing] = await db
+          .select()
+          .from(spaces)
+          .where(
+            and(
+              eq(spaces.seasonId, params.seasonId),
+              eq(spaces.name, params.name),
+            ),
+          );
+        if (existing) {
+          return {
+            id: existing.id,
+            name: existing.name,
+            type: existing.type,
+            width: existing.width,
+            length: existing.length,
+            alreadyExisted: true,
+          };
         }
         const [space] = await db.insert(spaces).values(params).returning();
         return {
