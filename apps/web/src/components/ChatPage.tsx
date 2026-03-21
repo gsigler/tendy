@@ -10,11 +10,17 @@ import {
   type User,
   type DebugEvent,
 } from "../lib/api";
+import SpaceGridCard from "./SpaceGridCard";
+import GardenMapCard from "./GardenMapCard";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface RichDisplay { _displayType: string; [key: string]: any; }
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   failed?: boolean;
+  richDisplays?: RichDisplay[];
 }
 
 interface ChatPageProps {
@@ -91,6 +97,9 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
     setStreaming(true);
     setDebugEvents([]);
 
+    // Collect rich displays from tool results during streaming
+    const richDisplays: RichDisplay[] = [];
+
     // Add placeholder for assistant
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
@@ -109,12 +118,34 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
         (chunk) => {
           setMessages((prev) => {
             const updated = [...prev];
-            updated[updated.length - 1] = { role: "assistant", content: chunk };
+            updated[updated.length - 1] = {
+              role: "assistant",
+              content: chunk,
+              richDisplays: richDisplays.length > 0 ? [...richDisplays] : undefined,
+            };
             return updated;
           });
         },
         (event) => {
           setDebugEvents((prev) => [...prev, event]);
+          // Capture rich display results
+          if (
+            event.type === "tool_result" &&
+            event.result &&
+            typeof event.result === "object" &&
+            "_displayType" in (event.result as Record<string, unknown>)
+          ) {
+            richDisplays.push(event.result as RichDisplay);
+            // Update message immediately with the new display
+            setMessages((prev) => {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                richDisplays: [...richDisplays],
+              };
+              return updated;
+            });
+          }
         },
       );
 
@@ -308,25 +339,39 @@ export default function ChatPage({ user, onLogout }: ChatPageProps) {
                   </div>
                 )}
                 <div
-                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                  className={`rounded-2xl text-sm leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-emerald-500 text-white rounded-br-md"
-                      : "bg-white/[0.07] text-emerald-100 border border-white/[0.08] rounded-bl-md"
+                      ? "max-w-[85%] sm:max-w-[75%] bg-emerald-500 text-white rounded-br-md px-4 py-2.5"
+                      : "max-w-[90%] sm:max-w-[85%] rounded-bl-md"
                   }`}
                 >
                   {msg.role === "assistant" ? (
                     <>
+                      {/* Rich display cards */}
+                      {msg.richDisplays?.map((display, di) => (
+                        <div key={di}>
+                          {display._displayType === "space_grid" && (
+                            <SpaceGridCard data={display as never} />
+                          )}
+                          {display._displayType === "garden_map" && (
+                            <GardenMapCard data={display as never} />
+                          )}
+                        </div>
+                      ))}
+                      {/* Text content */}
                       {msg.content ? (
-                        <div className="message-content">
+                        <div className="message-content bg-white/[0.07] text-emerald-100 border border-white/[0.08] rounded-2xl rounded-bl-md px-4 py-2.5">
                           <Markdown>{msg.content}</Markdown>
                         </div>
-                      ) : (
-                        <div className="flex gap-1 py-1">
-                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out infinite" }} />
-                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.2s infinite" }} />
-                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.4s infinite" }} />
+                      ) : !msg.richDisplays?.length ? (
+                        <div className="bg-white/[0.07] border border-white/[0.08] rounded-2xl rounded-bl-md px-4 py-2.5">
+                          <div className="flex gap-1 py-1">
+                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out infinite" }} />
+                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.2s infinite" }} />
+                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" style={{ animation: "pulse-dot 1.4s ease-in-out 0.4s infinite" }} />
+                          </div>
                         </div>
-                      )}
+                      ) : null}
                       {msg.failed && (
                         <button
                           onClick={handleRetry}

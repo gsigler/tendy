@@ -641,7 +641,44 @@ abbreviations to full crop names with health status.`,
         const usedCells = placementRows.length;
         ascii += `\n\n${usedCells}/${totalCells} cells occupied`;
 
-        return { ascii, spaceName: space.name, width, length, plantingCount: seen.size };
+        // Build structured grid data for rich rendering
+        const gridData: Array<{
+          row: number;
+          col: number;
+          crop: string | null;
+          variety: string | null;
+          stage: string | null;
+          health: string | null;
+          plantingId: string | null;
+          abbrev: string | null;
+        }> = [];
+        for (let r = 0; r < length; r++) {
+          for (let c = 0; c < width; c++) {
+            const p = placementRows.find((pl) => pl.row === r && pl.col === c);
+            gridData.push({
+              row: r,
+              col: c,
+              crop: p?.crop ?? null,
+              variety: p?.variety ?? null,
+              stage: p?.stage ?? null,
+              health: p?.health ?? null,
+              plantingId: p?.plantingId ?? null,
+              abbrev: p ? (plantingAbbrevs.get(p.plantingId) ?? null) : null,
+            });
+          }
+        }
+
+        return {
+          _displayType: "space_grid",
+          ascii,
+          spaceName: space.name,
+          spaceType: space.type,
+          width,
+          length,
+          unit: space.unit || "ft",
+          plantingCount: seen.size,
+          grid: gridData,
+        };
       },
     }),
 
@@ -740,7 +777,39 @@ Use this for a bird's-eye view of the entire garden layout.`,
           ascii += ` (${unassigned.length} unassigned)`;
         }
 
-        return { ascii, spaceCount: spaceList.length, plantingCount: plantingList.length };
+        // Build structured data for rich rendering
+        const spacesData = spaceList.map((space) => ({
+          id: space.id,
+          name: space.name,
+          type: space.type,
+          width: space.width,
+          length: space.length,
+          unit: space.unit,
+          plantings: (bySpace.get(space.id) || []).map((p) => ({
+            id: p.id,
+            crop: p.crop,
+            variety: p.variety,
+            stage: p.stage,
+            health: p.health,
+          })),
+        }));
+
+        return {
+          _displayType: "garden_map",
+          ascii,
+          seasonName: season.name,
+          seasonYear: season.year,
+          spaces: spacesData,
+          unassigned: unassigned.map((p) => ({
+            id: p.id,
+            crop: p.crop,
+            variety: p.variety,
+            stage: p.stage,
+            health: p.health,
+          })),
+          spaceCount: spaceList.length,
+          plantingCount: plantingList.length,
+        };
       },
     }),
 
