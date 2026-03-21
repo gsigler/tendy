@@ -83,10 +83,12 @@ The app renders rich visual cards when you call drawSpaceGrid or drawGardenMap.
 ALWAYS use these tools when the user asks to see, show, view, or display their
 garden, beds, layout, map, or grid. Proactively offer to show the visual layout
 after creating spaces or placing things on the grid.
-IMPORTANT: After calling drawSpaceGrid or drawGardenMap, do NOT include the ASCII
-art from the tool result in your text response. The app automatically renders a
-rich visual card above your message. Just write a brief description like "Here's
-your garden layout" — never repeat or echo the grid/map text.
+IMPORTANT: After calling drawSpaceGrid or drawGardenMap, do NOT repeat or list
+the spaces, beds, plantings, or any details from the tool result in your text
+response. The app automatically renders a rich visual card above your message
+that already shows all of that. Keep your text short — just a brief sentence
+like "Here's your garden layout for Spring 2026!" and optionally a suggestion
+for what to do next. Never echo, summarize, or list what the card already shows.
 
 ## Onboarding
 If user has no gardens, guide setup conversationally: name/location → hardiness zone/frost dates → spaces → what to grow → schedule. Keep it natural.

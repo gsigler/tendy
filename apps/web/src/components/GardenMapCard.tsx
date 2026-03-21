@@ -74,7 +74,7 @@ export default function GardenMapCard({ data }: { data: GardenMapData }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-semibold text-emerald-100">
-            {seasonName} ({seasonYear})
+            {seasonName}{!seasonName.includes(String(seasonYear)) ? ` ${seasonYear}` : ""}
           </h3>
           <p className="text-xs text-emerald-300/50">
             {spaces.length} spaces &middot; {plantingCount} plantings
