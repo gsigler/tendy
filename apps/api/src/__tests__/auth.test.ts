@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { app } from "../app.js";
-import { db } from "../db/index.js";
-import { users } from "../db/schema.js";
+import { cleanDb } from "./helpers.js";
 
 describe("Auth routes", () => {
   beforeEach(async () => {
-    await db.delete(users);
+    await cleanDb();
   });
 
   describe("POST /api/v1/auth/register", () => {

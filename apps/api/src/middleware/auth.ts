@@ -6,7 +6,7 @@ export type JwtPayload = {
   email: string;
 };
 
-type AuthEnv = {
+export type AuthEnv = {
   Variables: {
     userId: string;
     userEmail: string;
