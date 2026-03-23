@@ -12,6 +12,11 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>();
 
+/** Clear all rate-limit state (for use in tests). */
+export function clearBuckets() {
+  buckets.clear();
+}
+
 // Prune expired entries every 5 minutes to avoid unbounded memory growth
 setInterval(
   () => {

@@ -1,4 +1,5 @@
 import { db } from "../db/index.js";
+import { clearBuckets } from "../middleware/rate-limit.js";
 import {
   gridPlacements,
   events,
@@ -18,6 +19,7 @@ import { app } from "../app.js";
  * Delete all data from all tables in the correct FK order.
  */
 export async function cleanDb() {
+  clearBuckets();
   await db.delete(gridPlacements);
   await db.delete(harvests);
   await db.delete(events);
