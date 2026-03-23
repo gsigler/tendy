@@ -1,8 +1,27 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { AuthEnv } from "../../middleware/auth.js";
 import { taskService } from "../../services/index.js";
+import { TaskType, TaskPriority } from "@tendy/shared";
 
 export const tasks = new Hono<AuthEnv>();
+
+const CreateTaskSchema = z.object({
+  title: z.string().min(1),
+  type: TaskType.optional(),
+  priority: TaskPriority.optional(),
+  dueAt: z.string().optional(),
+  plantingId: z.string().uuid().optional(),
+  spaceId: z.string().uuid().optional(),
+  notes: z.string().optional(),
+});
+
+const UpdateTaskSchema = z.object({
+  title: z.string().min(1).optional(),
+  priority: TaskPriority.optional(),
+  dueAt: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 // Nested under /seasons/:seasonId/tasks
 tasks.get("/seasons/:seasonId/tasks", async (c) => {
@@ -23,7 +42,11 @@ tasks.post("/seasons/:seasonId/tasks", async (c) => {
   } catch {
     return c.json({ error: "Invalid JSON" }, 400);
   }
-  const result = await taskService.create(userId, { ...(body as Record<string, unknown>), seasonId } as Parameters<typeof taskService.create>[1]);
+  const parsed = CreateTaskSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, 400);
+  }
+  const result = await taskService.create(userId, { ...parsed.data, seasonId });
   if ("error" in result) return c.json(result, 404);
   return c.json(result, 201);
 });
@@ -33,7 +56,7 @@ tasks.get("/tasks/:taskId", async (c) => {
   const userId = c.get("userId");
   const taskId = c.req.param("taskId");
   const result = await taskService.get(userId, taskId);
-  if (!result) return c.json({ error: "Not found" }, 404);
+  if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });
 
@@ -46,7 +69,11 @@ tasks.patch("/tasks/:taskId", async (c) => {
   } catch {
     return c.json({ error: "Invalid JSON" }, 400);
   }
-  const result = await taskService.update(userId, taskId, body as Parameters<typeof taskService.update>[2]);
+  const parsed = UpdateTaskSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, 400);
+  }
+  const result = await taskService.update(userId, taskId, parsed.data);
   if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });

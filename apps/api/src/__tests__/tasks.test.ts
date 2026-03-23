@@ -25,7 +25,7 @@ describe("Tasks routes", () => {
       headers: authHeaders(token),
       body: JSON.stringify({
         title: "Water tomatoes",
-        type: "watering",
+        type: "maintenance",
         priority: "medium",
         dueAt: "2026-04-15T10:00:00Z",
         ...overrides,

@@ -22,6 +22,13 @@
       "when": 1774097634779,
       "tag": "0002_strong_wrecker",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774200000000,
+      "tag": "0003_cascade_deletes",
+      "breakpoints": true
     }
   ]
 }

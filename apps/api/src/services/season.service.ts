@@ -6,8 +6,6 @@ import {
   spaces,
   plantings,
   tasks,
-  events,
-  gridPlacements,
 } from "../db/schema.js";
 import { verifySeasonOwnership, verifyGardenOwnership } from "./auth-checks.js";
 
@@ -174,23 +172,7 @@ export async function del(userId: string, seasonId: string) {
   if (!(await verifySeasonOwnership(userId, seasonId))) {
     return { error: "Season not found" as const };
   }
-  // Delete in FK order
-  const plantingRows = await db
-    .select({ id: plantings.id })
-    .from(plantings)
-    .where(eq(plantings.seasonId, seasonId));
-  const plantingIds = plantingRows.map((p) => p.id);
-  if (plantingIds.length > 0) {
-    for (const pid of plantingIds) {
-      await db
-        .delete(gridPlacements)
-        .where(eq(gridPlacements.plantingId, pid));
-    }
-  }
-  await db.delete(events).where(eq(events.seasonId, seasonId));
-  await db.delete(tasks).where(eq(tasks.seasonId, seasonId));
-  await db.delete(plantings).where(eq(plantings.seasonId, seasonId));
-  await db.delete(spaces).where(eq(spaces.seasonId, seasonId));
+  // DB cascades: spaces/plantings/tasks/events/harvests/gridPlacements
   await db.delete(seasons).where(eq(seasons.id, seasonId));
   return { deleted: true, seasonId };
 }

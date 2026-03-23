@@ -202,13 +202,13 @@ describe("Plantings routes", () => {
         {
           method: "POST",
           headers: authHeaders(token),
-          body: JSON.stringify({ health: "stressed", reason: "Too much sun" }),
+          body: JSON.stringify({ health: "poor", reason: "Too much sun" }),
         },
       );
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.health).toBe("stressed");
+      expect(body.health).toBe("poor");
     });
   });
 

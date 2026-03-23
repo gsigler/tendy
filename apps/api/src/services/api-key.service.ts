@@ -70,11 +70,11 @@ export async function verify(keyHash: string): Promise<string | null> {
   // Check expiration
   if (row.expiresAt && row.expiresAt < new Date()) return null;
 
-  // Update lastUsedAt (fire-and-forget)
+  // Update lastUsedAt (fire-and-forget, log errors)
   db.update(apiKeys)
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKeys.id, row.id))
-    .then(() => {});
+    .catch((err) => console.error("[api-key] Failed to update lastUsedAt:", err));
 
   return row.userId;
 }

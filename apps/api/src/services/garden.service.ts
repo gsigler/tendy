@@ -1,14 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db/index.js";
-import {
-  gardens,
-  seasons,
-  spaces,
-  plantings,
-  tasks,
-  events,
-  gridPlacements,
-} from "../db/schema.js";
+import { gardens } from "../db/schema.js";
 import { verifyGardenOwnership } from "./auth-checks.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -103,28 +95,7 @@ export async function del(userId: string, gardenId: string) {
     .where(and(eq(gardens.id, gardenId), eq(gardens.userId, userId)));
   if (!garden) return { error: "Garden not found" as const };
 
-  // Get all seasons to cascade delete
-  const seasonRows = await db
-    .select({ id: seasons.id })
-    .from(seasons)
-    .where(eq(seasons.gardenId, gardenId));
-
-  for (const s of seasonRows) {
-    const plantingRows = await db
-      .select({ id: plantings.id })
-      .from(plantings)
-      .where(eq(plantings.seasonId, s.id));
-    for (const p of plantingRows) {
-      await db
-        .delete(gridPlacements)
-        .where(eq(gridPlacements.plantingId, p.id));
-    }
-    await db.delete(events).where(eq(events.seasonId, s.id));
-    await db.delete(tasks).where(eq(tasks.seasonId, s.id));
-    await db.delete(plantings).where(eq(plantings.seasonId, s.id));
-    await db.delete(spaces).where(eq(spaces.seasonId, s.id));
-  }
-  await db.delete(seasons).where(eq(seasons.gardenId, gardenId));
+  // DB cascades: seasons → spaces/plantings/tasks/events/harvests/gridPlacements
   await db.delete(gardens).where(eq(gardens.id, gardenId));
   return { deleted: true, gardenId };
 }

@@ -1,8 +1,18 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { AuthEnv } from "../../middleware/auth.js";
 import { eventService } from "../../services/index.js";
+import { EventType } from "@tendy/shared";
 
 export const events = new Hono<AuthEnv>();
+
+const RecordEventSchema = z.object({
+  type: EventType,
+  summary: z.string().min(1),
+  plantingId: z.string().uuid().optional(),
+  spaceId: z.string().uuid().optional(),
+  data: z.record(z.unknown()).optional(),
+});
 
 // Nested under /seasons/:seasonId/events
 events.get("/seasons/:seasonId/events", async (c) => {
@@ -24,7 +34,11 @@ events.post("/seasons/:seasonId/events", async (c) => {
   } catch {
     return c.json({ error: "Invalid JSON" }, 400);
   }
-  const result = await eventService.record(userId, { ...(body as Record<string, unknown>), seasonId } as Parameters<typeof eventService.record>[1]);
+  const parsed = RecordEventSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, 400);
+  }
+  const result = await eventService.record(userId, { ...parsed.data, seasonId });
   if ("error" in result) return c.json(result, 404);
   return c.json(result, 201);
 });

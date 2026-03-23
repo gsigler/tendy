@@ -34,7 +34,7 @@ export const apiKeys = pgTable("api_keys", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   prefix: varchar("prefix", { length: 8 }).notNull(),
   keyHash: varchar("key_hash", { length: 255 }).notNull(),
@@ -56,7 +56,7 @@ export const gardens = pgTable("gardens", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   location: text("location"),
   hardinessZone: text("hardiness_zone"),
@@ -81,7 +81,7 @@ export const seasons = pgTable("seasons", {
   id: uuid("id").defaultRandom().primaryKey(),
   gardenId: uuid("garden_id")
     .notNull()
-    .references(() => gardens.id),
+    .references(() => gardens.id, { onDelete: "cascade" }),
   year: integer("year").notNull(),
   name: text("name").notNull(),
   status: text("status").notNull().default("planning"),
@@ -113,7 +113,7 @@ export const spaces = pgTable("spaces", {
   id: uuid("id").defaultRandom().primaryKey(),
   seasonId: uuid("season_id")
     .notNull()
-    .references(() => seasons.id),
+    .references(() => seasons.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   type: text("type").notNull().default("RaisedBed"),
   layoutMode: text("layout_mode").default("grid"),
@@ -150,7 +150,7 @@ export const catalogEntries = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     crop: text("crop").notNull(),
     variety: text("variety"),
     vendor: text("vendor"),
@@ -201,9 +201,9 @@ export const plantings = pgTable("plantings", {
   id: uuid("id").defaultRandom().primaryKey(),
   seasonId: uuid("season_id")
     .notNull()
-    .references(() => seasons.id),
-  catalogId: uuid("catalog_id").references(() => catalogEntries.id),
-  spaceId: uuid("space_id").references(() => spaces.id),
+    .references(() => seasons.id, { onDelete: "cascade" }),
+  catalogId: uuid("catalog_id").references(() => catalogEntries.id, { onDelete: "set null" }),
+  spaceId: uuid("space_id").references(() => spaces.id, { onDelete: "set null" }),
   crop: text("crop").notNull(),
   variety: text("variety"),
   sourceType: text("source_type").notNull().default("seed"),
@@ -250,9 +250,9 @@ export const events = pgTable("events", {
   id: uuid("id").defaultRandom().primaryKey(),
   seasonId: uuid("season_id")
     .notNull()
-    .references(() => seasons.id),
-  plantingId: uuid("planting_id").references(() => plantings.id),
-  spaceId: uuid("space_id").references(() => spaces.id),
+    .references(() => seasons.id, { onDelete: "cascade" }),
+  plantingId: uuid("planting_id").references(() => plantings.id, { onDelete: "set null" }),
+  spaceId: uuid("space_id").references(() => spaces.id, { onDelete: "set null" }),
   type: text("type").notNull(),
   happenedAt: timestamp("happened_at", { withTimezone: true })
     .defaultNow()
@@ -284,10 +284,10 @@ export const gridPlacements = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     spaceId: uuid("space_id")
       .notNull()
-      .references(() => spaces.id),
+      .references(() => spaces.id, { onDelete: "cascade" }),
     plantingId: uuid("planting_id")
       .notNull()
-      .references(() => plantings.id),
+      .references(() => plantings.id, { onDelete: "cascade" }),
     row: integer("row").notNull(),
     col: integer("col").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -320,9 +320,9 @@ export const harvests = pgTable("harvests", {
   id: uuid("id").defaultRandom().primaryKey(),
   seasonId: uuid("season_id")
     .notNull()
-    .references(() => seasons.id),
-  plantingId: uuid("planting_id").references(() => plantings.id),
-  spaceId: uuid("space_id").references(() => spaces.id),
+    .references(() => seasons.id, { onDelete: "cascade" }),
+  plantingId: uuid("planting_id").references(() => plantings.id, { onDelete: "set null" }),
+  spaceId: uuid("space_id").references(() => spaces.id, { onDelete: "set null" }),
   crop: text("crop").notNull(),
   variety: text("variety"),
   quantity: real("quantity"),
@@ -356,9 +356,9 @@ export const tasks = pgTable("tasks", {
   id: uuid("id").defaultRandom().primaryKey(),
   seasonId: uuid("season_id")
     .notNull()
-    .references(() => seasons.id),
-  plantingId: uuid("planting_id").references(() => plantings.id),
-  spaceId: uuid("space_id").references(() => spaces.id),
+    .references(() => seasons.id, { onDelete: "cascade" }),
+  plantingId: uuid("planting_id").references(() => plantings.id, { onDelete: "set null" }),
+  spaceId: uuid("space_id").references(() => spaces.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   type: text("type").notNull().default("other"),
   status: text("status").notNull().default("pending"),
@@ -382,4 +382,3 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   }),
   space: one(spaces, { fields: [tasks.spaceId], references: [spaces.id] }),
 }));
-

@@ -1,8 +1,13 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { AuthEnv } from "../../middleware/auth.js";
 import * as apiKeyService from "../../services/api-key.service.js";
 
 export const apiKeysRoutes = new Hono<AuthEnv>();
+
+const CreateApiKeySchema = z.object({
+  name: z.string({ required_error: "name is required" }).min(1, "name is required"),
+});
 
 // List all API keys for the current user
 apiKeysRoutes.get("/", async (c) => {
@@ -21,12 +26,12 @@ apiKeysRoutes.post("/", async (c) => {
     return c.json({ error: "Invalid JSON" }, 400);
   }
 
-  const { name } = body as { name?: string };
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return c.json({ error: "name is required" }, 400);
+  const parsed = CreateApiKeySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? "name is required" }, 400);
   }
 
-  const key = await apiKeyService.create(userId, name.trim());
+  const key = await apiKeyService.create(userId, parsed.data.name.trim());
   return c.json(key, 201);
 });
 

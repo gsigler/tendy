@@ -1,15 +1,38 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { AuthEnv } from "../../middleware/auth.js";
 import * as harvestService from "../../services/harvest.service.js";
 
 export const harvestsRoutes = new Hono<AuthEnv>();
+
+const CreateHarvestSchema = z.object({
+  crop: z.string().min(1),
+  variety: z.string().optional(),
+  plantingId: z.string().uuid().optional(),
+  spaceId: z.string().uuid().optional(),
+  quantity: z.number().positive().optional(),
+  quantityUnit: z.string().optional(),
+  weightOz: z.number().positive().optional(),
+  harvestedAt: z.string().optional(),
+  quality: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const UpdateHarvestSchema = z.object({
+  quantity: z.number().positive().optional(),
+  quantityUnit: z.string().optional(),
+  weightOz: z.number().positive().optional(),
+  harvestedAt: z.string().optional(),
+  quality: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 // List harvests for a season
 harvestsRoutes.get("/seasons/:seasonId/harvests", async (c) => {
   const userId = c.get("userId");
   const seasonId = c.req.param("seasonId");
   const result = await harvestService.list(userId, seasonId);
-  if (result && "error" in result) return c.json(result, 404);
+  if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });
 
@@ -18,7 +41,7 @@ harvestsRoutes.get("/seasons/:seasonId/harvest-summary", async (c) => {
   const userId = c.get("userId");
   const seasonId = c.req.param("seasonId");
   const result = await harvestService.summary(userId, seasonId);
-  if (result && "error" in result) return c.json(result, 404);
+  if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });
 
@@ -41,12 +64,11 @@ harvestsRoutes.post("/seasons/:seasonId/harvests", async (c) => {
   } catch {
     return c.json({ error: "Invalid JSON" }, 400);
   }
-  const params = body as Record<string, unknown>;
-  const result = await harvestService.create(userId, {
-    seasonId,
-    ...params,
-    crop: params.crop as string,
-  });
+  const parsed = CreateHarvestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, 400);
+  }
+  const result = await harvestService.create(userId, { ...parsed.data, seasonId });
   if (result && "error" in result) return c.json(result, 404);
   return c.json(result, 201);
 });
@@ -61,7 +83,11 @@ harvestsRoutes.patch("/harvests/:harvestId", async (c) => {
   } catch {
     return c.json({ error: "Invalid JSON" }, 400);
   }
-  const result = await harvestService.update(userId, harvestId, body as Record<string, unknown>);
+  const parsed = UpdateHarvestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, 400);
+  }
+  const result = await harvestService.update(userId, harvestId, parsed.data);
   if (!result || "error" in result) return c.json({ error: "Not found" }, 404);
   return c.json(result);
 });
