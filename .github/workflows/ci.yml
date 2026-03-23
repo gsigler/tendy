@@ -43,6 +43,9 @@ jobs:
           DATABASE_URL: postgresql://tendy:tendy@localhost:5432/tendy
         run: pnpm exec drizzle-kit migrate
 
+      - name: Build shared package
+        run: pnpm --filter @tendy/shared build
+
       - name: Typecheck
         run: pnpm --filter @tendy/api typecheck
 
