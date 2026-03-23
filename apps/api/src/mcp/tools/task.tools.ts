@@ -15,7 +15,8 @@ export function registerTaskTools(server: McpServer, userId: string) {
         const tasks = await taskService.list(userId, seasonId, status);
         return { content: [{ type: "text", text: JSON.stringify(tasks, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -32,7 +33,8 @@ export function registerTaskTools(server: McpServer, userId: string) {
         if (!task) return { content: [{ type: "text" as const, text: "Task not found" }], isError: true };
         return { content: [{ type: "text" as const, text: JSON.stringify(task, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -55,7 +57,8 @@ export function registerTaskTools(server: McpServer, userId: string) {
         const task = await taskService.create(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(task, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -75,7 +78,8 @@ export function registerTaskTools(server: McpServer, userId: string) {
         const result = await taskService.update(userId, taskId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -91,7 +95,8 @@ export function registerTaskTools(server: McpServer, userId: string) {
         const result = await taskService.complete(userId, taskId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -107,7 +112,8 @@ export function registerTaskTools(server: McpServer, userId: string) {
         const result = await taskService.skip(userId, taskId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -123,7 +129,8 @@ export function registerTaskTools(server: McpServer, userId: string) {
         const result = await taskService.del(userId, taskId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

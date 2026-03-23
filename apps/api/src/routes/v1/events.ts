@@ -14,13 +14,19 @@ const RecordEventSchema = z.object({
   data: z.record(z.unknown()).optional(),
 });
 
+const ListEventsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 // Nested under /seasons/:seasonId/events
 events.get("/seasons/:seasonId/events", async (c) => {
   const userId = c.get("userId");
   const seasonId = c.req.param("seasonId");
-  const limitStr = c.req.query("limit");
-  const limit = limitStr ? parseInt(limitStr, 10) : undefined;
-  const result = await eventService.listRecent(userId, seasonId, limit);
+  const parsed = ListEventsQuerySchema.safeParse({ limit: c.req.query("limit") });
+  if (!parsed.success) {
+    return c.json({ error: "limit must be an integer between 1 and 100" }, 400);
+  }
+  const result = await eventService.listRecent(userId, seasonId, parsed.data.limit);
   if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });

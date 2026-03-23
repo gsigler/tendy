@@ -14,7 +14,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         const spaces = await spaceService.list(userId, seasonId);
         return { content: [{ type: "text", text: JSON.stringify(spaces, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -31,7 +32,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         if (!space) return { content: [{ type: "text" as const, text: "Space not found" }], isError: true };
         return { content: [{ type: "text" as const, text: JSON.stringify(space, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -56,7 +58,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         const space = await spaceService.create(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(space, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -80,7 +83,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         const result = await spaceService.update(userId, spaceId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -96,7 +100,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         const result = await spaceService.del(userId, spaceId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -112,7 +117,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         const grid = await spaceService.getGrid(userId, spaceId);
         return { content: [{ type: "text", text: JSON.stringify(grid, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -133,7 +139,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         const result = await spaceService.placeOnGrid(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -150,7 +157,8 @@ export function registerSpaceTools(server: McpServer, userId: string) {
         const result = await spaceService.removeFromGrid(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

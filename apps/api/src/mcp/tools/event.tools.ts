@@ -20,7 +20,8 @@ export function registerEventTools(server: McpServer, userId: string) {
         const events = await eventService.listRecent(userId, seasonId, limit);
         return { content: [{ type: "text", text: JSON.stringify(events, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -41,7 +42,8 @@ export function registerEventTools(server: McpServer, userId: string) {
         const event = await eventService.record(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(event, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -57,7 +59,8 @@ export function registerEventTools(server: McpServer, userId: string) {
         const result = await eventService.del(userId, eventId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

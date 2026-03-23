@@ -5,7 +5,7 @@ import {
   plantings,
   gridPlacements,
 } from "../db/schema.js";
-import { verifySeasonOwnership } from "./auth-checks.js";
+import { verifySeasonOwnership, verifyPlantingOwnership } from "./auth-checks.js";
 import type { SpaceType } from "@tendy/shared";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -218,6 +218,23 @@ export async function placeOnGrid(
   if (!(await verifySpaceOwnership(userId, params.spaceId))) {
     return { error: "Space not found" as const };
   }
+  if (!(await verifyPlantingOwnership(userId, params.plantingId))) {
+    return { error: "Planting not found" as const };
+  }
+
+  // Verify the planting belongs to the same season as the space
+  const [spaceRow] = await db
+    .select({ seasonId: spaces.seasonId })
+    .from(spaces)
+    .where(eq(spaces.id, params.spaceId));
+  const [plantingRow] = await db
+    .select({ seasonId: plantings.seasonId })
+    .from(plantings)
+    .where(eq(plantings.id, params.plantingId));
+  if (!spaceRow || !plantingRow || spaceRow.seasonId !== plantingRow.seasonId) {
+    return { error: "Planting does not belong to the same season as the space" as const };
+  }
+
   const values = params.cells.map((c) => ({
     spaceId: params.spaceId,
     plantingId: params.plantingId,

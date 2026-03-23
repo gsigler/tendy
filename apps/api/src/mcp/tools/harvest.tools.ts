@@ -12,7 +12,8 @@ export function registerHarvestTools(server: McpServer, userId: string) {
         const result = await harvestService.list(userId, seasonId);
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -27,7 +28,8 @@ export function registerHarvestTools(server: McpServer, userId: string) {
         if (!result) return { content: [{ type: "text" as const, text: "Harvest not found" }], isError: true };
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -53,7 +55,8 @@ export function registerHarvestTools(server: McpServer, userId: string) {
         const result = await harvestService.create(userId, params);
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -76,7 +79,8 @@ export function registerHarvestTools(server: McpServer, userId: string) {
         if (!result) return { content: [{ type: "text" as const, text: "Harvest not found" }], isError: true };
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -90,7 +94,8 @@ export function registerHarvestTools(server: McpServer, userId: string) {
         await harvestService.del(userId, harvestId);
         return { content: [{ type: "text" as const, text: "Harvest deleted" }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -104,7 +109,8 @@ export function registerHarvestTools(server: McpServer, userId: string) {
         const result = await harvestService.summary(userId, seasonId);
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

@@ -16,7 +16,8 @@ export function registerCatalogTools(server: McpServer, userId: string) {
         const results = await catalogService.search(userId, query);
         return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -43,7 +44,8 @@ export function registerCatalogTools(server: McpServer, userId: string) {
         const entry = await catalogService.create(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(entry, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -59,7 +61,8 @@ export function registerCatalogTools(server: McpServer, userId: string) {
         const entry = await catalogService.get(userId, catalogId);
         return { content: [{ type: "text", text: JSON.stringify(entry, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -88,7 +91,8 @@ export function registerCatalogTools(server: McpServer, userId: string) {
         const result = await catalogService.update(userId, catalogId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -104,7 +108,8 @@ export function registerCatalogTools(server: McpServer, userId: string) {
         const result = await catalogService.del(userId, catalogId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

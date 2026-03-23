@@ -12,7 +12,8 @@ export function registerGardenTools(server: McpServer, userId: string) {
         const gardens = await gardenService.list(userId);
         return { content: [{ type: "text", text: JSON.stringify(gardens, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -29,7 +30,8 @@ export function registerGardenTools(server: McpServer, userId: string) {
         if (!garden) return { content: [{ type: "text" as const, text: "Garden not found" }], isError: true };
         return { content: [{ type: "text" as const, text: JSON.stringify(garden, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -49,7 +51,8 @@ export function registerGardenTools(server: McpServer, userId: string) {
         const garden = await gardenService.create(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(garden, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -70,7 +73,8 @@ export function registerGardenTools(server: McpServer, userId: string) {
         const result = await gardenService.update(userId, gardenId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -86,7 +90,8 @@ export function registerGardenTools(server: McpServer, userId: string) {
         const result = await gardenService.del(userId, gardenId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

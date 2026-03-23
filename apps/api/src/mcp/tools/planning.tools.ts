@@ -14,7 +14,8 @@ export function registerPlanningTools(server: McpServer, userId: string) {
         const plan = await planningService.getWeekPlan(userId, seasonId);
         return { content: [{ type: "text", text: JSON.stringify(plan, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -30,7 +31,8 @@ export function registerPlanningTools(server: McpServer, userId: string) {
         const schedule = await planningService.getPlantingSchedule(userId, seasonId);
         return { content: [{ type: "text", text: JSON.stringify(schedule, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -46,7 +48,8 @@ export function registerPlanningTools(server: McpServer, userId: string) {
         const result = await planningService.generateAutoTasks(userId, seasonId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
