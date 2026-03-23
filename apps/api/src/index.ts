@@ -1,6 +1,8 @@
-import { serve } from "@hono/node-server";
+import { createServer } from "node:http";
+import { getRequestListener } from "@hono/node-server";
 import { app } from "./app.js";
 import { closeDb } from "./db/index.js";
+import { handleMcpRequest } from "./mcp/transport.js";
 
 // Validate required env vars at startup
 const required = ["DATABASE_URL", "JWT_SECRET"];
@@ -11,16 +13,29 @@ for (const key of required) {
   }
 }
 
-if (!process.env.OPENAI_API_KEY) {
-  console.warn(
-    "WARNING: OPENAI_API_KEY not set — chat endpoint will fail. Set it in .env",
-  );
-}
-
 const port = Number(process.env.PORT) || 3000;
 
-const server = serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`Tendy API running on http://localhost:${info.port}`);
+const nodeHandler = getRequestListener(app.fetch);
+
+const server = createServer(async (req, res) => {
+  // Handle MCP requests at the Node.js level (bypasses Hono)
+  if (req.url?.startsWith("/mcp")) {
+    try {
+      await handleMcpRequest(req, res);
+    } catch (e) {
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Internal server error" }));
+      }
+    }
+    return;
+  }
+  // Everything else goes to Hono
+  nodeHandler(req, res);
+});
+
+server.listen(port, () => {
+  console.log(`Tendy API running on http://localhost:${port}`);
 });
 
 function shutdown() {

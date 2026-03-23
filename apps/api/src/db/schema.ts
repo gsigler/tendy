@@ -25,7 +25,29 @@ export const users = pgTable("users", {
 
 export const usersRelations = relations(users, ({ many }) => ({
   gardens: many(gardens),
-  conversationSessions: many(conversationSessions),
+  apiKeys: many(apiKeys),
+}));
+
+// ── API Keys ──────────────────────────────────────────────────────────────
+
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  prefix: varchar("prefix", { length: 8 }).notNull(),
+  keyHash: varchar("key_hash", { length: 255 }).notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  user: one(users, { fields: [apiKeys.userId], references: [users.id] }),
 }));
 
 // ── Gardens ────────────────────────────────────────────────────────────────
@@ -82,6 +104,7 @@ export const seasonsRelations = relations(seasons, ({ one, many }) => ({
   plantings: many(plantings),
   tasks: many(tasks),
   events: many(events),
+  harvests: many(harvests),
 }));
 
 // ── Spaces ─────────────────────────────────────────────────────────────────
@@ -141,6 +164,9 @@ export const catalogEntries = pgTable(
     sun: text("sun"),
     growthHabit: text("growth_habit"),
     gridSquares: integer("grid_squares"),
+    rating: integer("rating"),
+    wouldGrowAgain: integer("would_grow_again"),
+    yieldNotes: text("yield_notes"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -166,7 +192,6 @@ export const catalogEntriesRelations = relations(
       references: [users.id],
     }),
     plantings: many(plantings),
-    reviews: many(catalogReviews),
   }),
 );
 
@@ -218,49 +243,6 @@ export const plantingsRelations = relations(plantings, ({ one, many }) => ({
   gridPlacements: many(gridPlacements),
 }));
 
-// ── Catalog Reviews ────────────────────────────────────────────────────────
-
-export const catalogReviews = pgTable(
-  "catalog_reviews",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    catalogId: uuid("catalog_id")
-      .notNull()
-      .references(() => catalogEntries.id),
-    seasonId: uuid("season_id")
-      .notNull()
-      .references(() => seasons.id),
-    plantingId: uuid("planting_id").references(() => plantings.id),
-    rating: integer("rating"),
-    yieldNotes: text("yield_notes"),
-    wouldGrowAgain: integer("would_grow_again"),
-    review: text("review"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    uniqueIndex("catalog_reviews_catalog_season_idx").on(
-      table.catalogId,
-      table.seasonId,
-    ),
-  ],
-);
-
-export const catalogReviewsRelations = relations(catalogReviews, ({ one }) => ({
-  catalog: one(catalogEntries, {
-    fields: [catalogReviews.catalogId],
-    references: [catalogEntries.id],
-  }),
-  season: one(seasons, {
-    fields: [catalogReviews.seasonId],
-    references: [seasons.id],
-  }),
-  planting: one(plantings, {
-    fields: [catalogReviews.plantingId],
-    references: [plantings.id],
-  }),
-}));
 
 // ── Events ─────────────────────────────────────────────────────────────────
 
@@ -332,6 +314,42 @@ export const gridPlacementsRelations = relations(gridPlacements, ({ one }) => ({
   }),
 }));
 
+// ── Harvests ──────────────────────────────────────────────────────────
+
+export const harvests = pgTable("harvests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  seasonId: uuid("season_id")
+    .notNull()
+    .references(() => seasons.id),
+  plantingId: uuid("planting_id").references(() => plantings.id),
+  spaceId: uuid("space_id").references(() => spaces.id),
+  crop: text("crop").notNull(),
+  variety: text("variety"),
+  quantity: real("quantity"),
+  quantityUnit: text("quantity_unit"),
+  weightOz: real("weight_oz"),
+  harvestedAt: timestamp("harvested_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  quality: text("quality").default("good"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const harvestsRelations = relations(harvests, ({ one }) => ({
+  season: one(seasons, {
+    fields: [harvests.seasonId],
+    references: [seasons.id],
+  }),
+  planting: one(plantings, {
+    fields: [harvests.plantingId],
+    references: [plantings.id],
+  }),
+  space: one(spaces, { fields: [harvests.spaceId], references: [spaces.id] }),
+}));
+
 // ── Tasks ──────────────────────────────────────────────────────────────────
 
 export const tasks = pgTable("tasks", {
@@ -365,60 +383,3 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   space: one(spaces, { fields: [tasks.spaceId], references: [spaces.id] }),
 }));
 
-// ── Conversation Sessions ──────────────────────────────────────────────────
-
-export const conversationSessions = pgTable("conversation_sessions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  seasonId: uuid("season_id").references(() => seasons.id),
-  title: text("title"),
-  summary: text("summary"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
-});
-
-export const conversationSessionsRelations = relations(
-  conversationSessions,
-  ({ one, many }) => ({
-    user: one(users, {
-      fields: [conversationSessions.userId],
-      references: [users.id],
-    }),
-    season: one(seasons, {
-      fields: [conversationSessions.seasonId],
-      references: [seasons.id],
-    }),
-    messages: many(conversationMessages),
-  }),
-);
-
-// ── Conversation Messages ──────────────────────────────────────────────────
-
-export const conversationMessages = pgTable("conversation_messages", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  sessionId: uuid("session_id")
-    .notNull()
-    .references(() => conversationSessions.id),
-  role: text("role").notNull(),
-  content: text("content"),
-  toolCallId: text("tool_call_id"),
-  toolCallsJson: jsonb("tool_calls_json"),
-  tokenCount: integer("token_count"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
-
-export const conversationMessagesRelations = relations(
-  conversationMessages,
-  ({ one }) => ({
-    session: one(conversationSessions, {
-      fields: [conversationMessages.sessionId],
-      references: [conversationSessions.id],
-    }),
-  }),
-);

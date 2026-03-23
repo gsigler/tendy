@@ -64,7 +64,6 @@ export const EventType = z.enum([
   "observation",
   "watering",
   "fertilizing",
-  "harvest",
   "pest",
   "disease",
   "weather",
@@ -90,24 +89,3 @@ export const LoginRequestSchema = z.object({
 });
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
-// ── Chat Schemas ───────────────────────────────────────────────────────────
-
-export const ChatMessageSchema = z.object({
-  role: z.enum(["user", "assistant"]),
-  content: z.string().min(1),
-});
-export type ChatMessage = z.infer<typeof ChatMessageSchema>;
-
-export const ChatRequestSchema = z.object({
-  message: z.string().min(1).max(4000),
-  sessionId: z.string().uuid().optional(),
-});
-export type ChatRequest = z.infer<typeof ChatRequestSchema>;
-
-// ── Session Schemas ────────────────────────────────────────────────────────
-
-export const CreateSessionSchema = z.object({
-  seasonId: z.string().uuid().optional(),
-  title: z.string().optional(),
-});
-export type CreateSession = z.infer<typeof CreateSessionSchema>;
