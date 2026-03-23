@@ -18,7 +18,7 @@ const port = Number(process.env.PORT) || 3000;
 const nodeHandler = getRequestListener(app.fetch);
 
 const server = createServer(async (req, res) => {
-  // Handle MCP requests at the Node.js level (bypasses Hono)
+  // MCP requires raw Node.js streams for SSE — must bypass Hono
   if (req.url?.startsWith("/mcp")) {
     try {
       await handleMcpRequest(req, res);

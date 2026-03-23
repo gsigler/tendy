@@ -1,19 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { createMcpServer } from "./server.js";
 import { authenticateBearer } from "../middleware/auth.js";
 
 interface SessionEntry {
-  transport: StreamableHTTPServerTransport;
+  transport: SSEServerTransport;
   userId: string;
 }
 
 const sessions = new Map<string, SessionEntry>();
 
-/**
- * Extract and verify JWT from the Authorization header.
- * Returns the userId or writes an error response and returns null.
- */
 async function authenticate(
   req: IncomingMessage,
   res: ServerResponse,
@@ -21,7 +17,7 @@ async function authenticate(
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     res.writeHead(401, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Missing or invalid Authorization header" }));
+    res.end(JSON.stringify({ error: "Unauthorized" }));
     return null;
   }
   const auth = await authenticateBearer(authHeader.slice(7));
@@ -34,64 +30,69 @@ async function authenticate(
 }
 
 /**
- * Handle all MCP HTTP requests (POST, GET, DELETE) on /mcp.
+ * Handle MCP SSE transport: GET /mcp establishes the SSE stream,
+ * POST /mcp/message sends messages to the transport.
  *
- * - POST without mcp-session-id: initialize a new session
- * - POST/GET/DELETE with mcp-session-id: route to existing session transport
+ * NOTE: This runs at the Node.js http level (outside Hono) because SSE
+ * requires holding the raw socket open — Hono's response lifecycle closes it.
+ * Logging is handled here directly.
  */
 export async function handleMcpRequest(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
-  // Authenticate every request
   const userId = await authenticate(req, res);
   if (!userId) return;
 
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  const url = new URL(req.url || "", `http://${req.headers.host}`);
+  console.log(`  [MCP] ${req.method} ${url.pathname} sessions=${[...sessions.keys()].join(",") || "none"}`);
 
-  // Route to existing session if we have a session ID
-  if (sessionId) {
+  // GET /mcp — establish SSE stream
+  if (req.method === "GET" && url.pathname === "/mcp") {
+    console.log(`  <-- MCP GET /mcp (new SSE connection) userId=${userId}`);
+    const transport = new SSEServerTransport("/mcp/message", res);
+    const server = createMcpServer(userId);
+
+    transport.onclose = () => {
+      console.log(`  --> MCP session closed sessionId=${transport.sessionId}`);
+      if (transport.sessionId) {
+        sessions.delete(transport.sessionId);
+      }
+    };
+
+    await server.connect(transport);
+
+    if (transport.sessionId) {
+      sessions.set(transport.sessionId, { transport, userId });
+      console.log(`  --> MCP session established sessionId=${transport.sessionId}`);
+    }
+    return;
+  }
+
+  // POST /mcp/message — send message to existing session
+  if (req.method === "POST" && url.pathname === "/mcp/message") {
+    const sessionId = url.searchParams.get("sessionId");
+    if (!sessionId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Missing sessionId query parameter" }));
+      return;
+    }
     const session = sessions.get(sessionId);
     if (!session) {
-      // Session not found — client should re-initialize
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Session not found" }));
       return;
     }
-    // Ensure the session belongs to this user
     if (session.userId !== userId) {
       res.writeHead(403, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Session does not belong to this user" }));
+      res.end(JSON.stringify({ error: "Forbidden" }));
       return;
     }
-    await session.transport.handleRequest(req, res);
+    console.log(`  <-- MCP POST /mcp/message sessionId=${sessionId}`);
+    await session.transport.handlePostMessage(req, res);
     return;
   }
 
-  // No session ID — must be a POST to initialize a new session
-  if (req.method !== "POST") {
-    res.writeHead(400, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Missing mcp-session-id header. Send a POST to initialize a session first." }));
-    return;
-  }
-
-  // Create new transport and MCP server for this user
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID(),
-  });
-  const server = createMcpServer(userId);
-
-  transport.onclose = () => {
-    if (transport.sessionId) {
-      sessions.delete(transport.sessionId);
-    }
-  };
-
-  await server.connect(transport);
-
-  if (transport.sessionId) {
-    sessions.set(transport.sessionId, { transport, userId });
-  }
-
-  await transport.handleRequest(req, res);
+  res.writeHead(405, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Method not allowed" }));
 }
