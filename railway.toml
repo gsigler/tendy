@@ -1,0 +1,5 @@
+[build]
+buildCommand = "turbo build"
+
+[deploy]
+startCommand = "node apps/api/dist/index.js"
