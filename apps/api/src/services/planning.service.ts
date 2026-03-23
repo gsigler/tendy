@@ -227,7 +227,7 @@ export async function generateAutoTasks(userId: string, seasonId: string) {
       ),
     );
 
-  // Get existing tasks to avoid duplicates
+  // Get existing tasks to avoid duplicates (keyed by plantingId:type)
   const existingTasks = await db
     .select({
       plantingId: tasks.plantingId,
@@ -249,34 +249,45 @@ export async function generateAutoTasks(userId: string, seasonId: string) {
     dueAt: Date;
   }> = [];
 
+  // Dedup across plantings: track crop+variety+type+date so the same
+  // variety in multiple beds only produces one task.
+  const seenVariantTasks = new Set<string>();
+
   for (const p of plantingRows) {
     const label = p.variety ? `${p.crop} (${p.variety})` : p.crop;
+    const variantKey = p.variety ? `${p.crop}:${p.variety}` : `${p.crop}:`;
 
     // Seed start task
-    if (
-      p.startIndoorsWeeks &&
-      p.sourceType === "seed" &&
-      !existingSet.has(`${p.id}:seed_start`)
-    ) {
+    if (p.startIndoorsWeeks && p.sourceType === "seed") {
       const startDate = new Date(lastFrost);
       startDate.setDate(startDate.getDate() - p.startIndoorsWeeks * 7);
-      newTasks.push({
-        seasonId,
-        plantingId: p.id,
-        title: `Start ${label} seeds indoors`,
-        type: "seed_start",
-        priority: "high",
-        dueAt: startDate,
-      });
+      const dateKey = startDate.toISOString().split("T")[0];
+      const dedupeKey = `${variantKey}:seed_start:${dateKey}`;
+
+      if (!existingSet.has(`${p.id}:seed_start`) && !seenVariantTasks.has(dedupeKey)) {
+        seenVariantTasks.add(dedupeKey);
+        newTasks.push({
+          seasonId,
+          plantingId: p.id,
+          title: `Start ${label} seeds indoors`,
+          type: "seed_start",
+          priority: "high",
+          dueAt: startDate,
+        });
+      }
     }
 
     // Transplant task
-    if (!existingSet.has(`${p.id}:transplant`)) {
-      const transplantDate = new Date(lastFrost);
-      if (p.minNightTemp && p.minNightTemp > 32) {
-        const extraDays = Math.ceil(((p.minNightTemp - 32) / 5) * 7);
-        transplantDate.setDate(transplantDate.getDate() + extraDays);
-      }
+    const transplantDate = new Date(lastFrost);
+    if (p.minNightTemp && p.minNightTemp > 32) {
+      const extraDays = Math.ceil(((p.minNightTemp - 32) / 5) * 7);
+      transplantDate.setDate(transplantDate.getDate() + extraDays);
+    }
+    const dateKey = transplantDate.toISOString().split("T")[0];
+    const dedupeKey = `${variantKey}:transplant:${dateKey}`;
+
+    if (!existingSet.has(`${p.id}:transplant`) && !seenVariantTasks.has(dedupeKey)) {
+      seenVariantTasks.add(dedupeKey);
       newTasks.push({
         seasonId,
         plantingId: p.id,

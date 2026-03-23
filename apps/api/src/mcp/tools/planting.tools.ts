@@ -89,14 +89,15 @@ export function registerPlantingTools(server: McpServer, userId: string) {
 
   server.tool(
     "advancePlantingStage",
-    "Advance a planting to a new growth stage. Automatically records timestamps (startedAt, hardenedAt, transplantedAt) and logs a stage_change event.",
+    "Advance a planting to a new growth stage. Automatically records timestamps (startedAt, hardenedAt, transplantedAt) and logs a stage_change event. Pass an optional date (ISO string) to record a past action accurately (e.g. 'I started these seeds yesterday').",
     {
       plantingId: z.string().describe("ID of the planting"),
       newStage: z.enum(plantingStages).describe("New growth stage"),
+      date: z.string().optional().describe("Optional ISO date string to use as the timestamp instead of now (e.g. '2025-03-15' or '2025-03-15T10:00:00Z')"),
     },
-    async ({ plantingId, newStage }) => {
+    async ({ plantingId, newStage, date }) => {
       try {
-        const result = await plantingService.advanceStage(userId, plantingId, newStage);
+        const result = await plantingService.advanceStage(userId, plantingId, newStage, date);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
         return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };

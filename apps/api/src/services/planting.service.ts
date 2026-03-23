@@ -182,6 +182,7 @@ export async function advanceStage(
   userId: string,
   plantingId: string,
   newStage: PlantingStage,
+  date?: string,
 ) {
   if (!(await verifyPlantingOwnership(userId, plantingId))) {
     return { error: "Planting not found" as const };
@@ -193,15 +194,15 @@ export async function advanceStage(
   if (!planting) return { error: "Planting not found" as const };
 
   const timestampUpdates: Record<string, Date> = {};
-  const now = new Date();
+  const ts = date ? new Date(date) : new Date();
   if (newStage === "seeded_indoors" || newStage === "direct_sown") {
-    timestampUpdates.startedAt = now;
+    timestampUpdates.startedAt = ts;
   }
   if (newStage === "hardening_off") {
-    timestampUpdates.hardenedAt = now;
+    timestampUpdates.hardenedAt = ts;
   }
   if (newStage === "transplanted") {
-    timestampUpdates.transplantedAt = now;
+    timestampUpdates.transplantedAt = ts;
   }
 
   const [updated] = await db
@@ -209,7 +210,7 @@ export async function advanceStage(
     .set({
       stage: newStage,
       ...timestampUpdates,
-      updatedAt: now,
+      updatedAt: new Date(),
     })
     .where(eq(plantings.id, plantingId))
     .returning();
@@ -219,6 +220,7 @@ export async function advanceStage(
     seasonId: planting.seasonId,
     plantingId,
     type: "stage_change",
+    happenedAt: ts,
     summary: `${planting.crop}${planting.variety ? ` (${planting.variety})` : ""}: ${planting.stage} → ${newStage}`,
     dataJson: {
       previousStage: planting.stage,
