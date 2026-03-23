@@ -14,7 +14,8 @@ export function registerSeasonTools(server: McpServer, userId: string) {
         const seasons = await seasonService.list(userId, gardenId);
         return { content: [{ type: "text", text: JSON.stringify(seasons, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -31,7 +32,8 @@ export function registerSeasonTools(server: McpServer, userId: string) {
         if (!season) return { content: [{ type: "text" as const, text: "Season not found" }], isError: true };
         return { content: [{ type: "text" as const, text: JSON.stringify(season, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -51,7 +53,8 @@ export function registerSeasonTools(server: McpServer, userId: string) {
         const season = await seasonService.create(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(season, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -70,7 +73,8 @@ export function registerSeasonTools(server: McpServer, userId: string) {
         const result = await seasonService.update(userId, seasonId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -86,7 +90,8 @@ export function registerSeasonTools(server: McpServer, userId: string) {
         const result = await seasonService.del(userId, seasonId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -102,7 +107,8 @@ export function registerSeasonTools(server: McpServer, userId: string) {
         const summary = await seasonService.getSummary(userId, seasonId);
         return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

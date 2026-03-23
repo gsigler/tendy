@@ -22,7 +22,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         const plantings = await plantingService.list(userId, seasonId, stage);
         return { content: [{ type: "text", text: JSON.stringify(plantings, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -39,7 +40,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         if (!planting) return { content: [{ type: "text" as const, text: "Planting not found" }], isError: true };
         return { content: [{ type: "text" as const, text: JSON.stringify(planting, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text" as const, text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -62,7 +64,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         const planting = await plantingService.create(userId, params);
         return { content: [{ type: "text", text: JSON.stringify(planting, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -82,7 +85,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         const result = await plantingService.update(userId, plantingId, params);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -100,7 +104,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         const result = await plantingService.advanceStage(userId, plantingId, newStage, date);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -118,7 +123,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         const result = await plantingService.updateHealth(userId, plantingId, health, reason);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -135,7 +141,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         const result = await plantingService.move(userId, plantingId, newSpaceId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );
@@ -151,7 +158,8 @@ export function registerPlantingTools(server: McpServer, userId: string) {
         const result = await plantingService.del(userId, plantingId);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        console.error("[mcp] tool error:", e);
+        return { content: [{ type: "text", text: "An error occurred. Please try again." }], isError: true };
       }
     },
   );

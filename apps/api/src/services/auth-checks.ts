@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { gardens, seasons } from "../db/schema.js";
+import { gardens, seasons, plantings } from "../db/schema.js";
 
 /**
  * Verify that a season belongs to the given user by walking the FK chain:
@@ -16,6 +16,23 @@ export async function verifySeasonOwnership(
     .innerJoin(gardens, eq(seasons.gardenId, gardens.id))
     .where(and(eq(seasons.id, seasonId), eq(gardens.userId, userId)));
   return !!season;
+}
+
+/**
+ * Verify that a planting belongs to the given user by walking:
+ * planting -> season -> garden -> user
+ */
+export async function verifyPlantingOwnership(
+  userId: string,
+  plantingId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ gardenUserId: gardens.userId })
+    .from(plantings)
+    .innerJoin(seasons, eq(plantings.seasonId, seasons.id))
+    .innerJoin(gardens, eq(seasons.gardenId, gardens.id))
+    .where(and(eq(plantings.id, plantingId), eq(gardens.userId, userId)));
+  return !!row;
 }
 
 /**

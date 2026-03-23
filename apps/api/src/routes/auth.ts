@@ -4,11 +4,15 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { signToken } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import { RegisterRequestSchema, LoginRequestSchema } from "@tendy/shared";
 
 export const auth = new Hono();
 
-auth.post("/v1/auth/register", async (c) => {
+// 10 attempts per 15 minutes per IP
+const authRateLimit = rateLimit({ limit: 10, windowMs: 15 * 60 * 1000 });
+
+auth.post("/v1/auth/register", authRateLimit, async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
@@ -52,7 +56,7 @@ auth.post("/v1/auth/register", async (c) => {
   return c.json({ token, user: { id: user.id, email: user.email, name: user.name } }, 201);
 });
 
-auth.post("/v1/auth/login", async (c) => {
+auth.post("/v1/auth/login", authRateLimit, async (c) => {
   let body: unknown;
   try {
     body = await c.req.json();
