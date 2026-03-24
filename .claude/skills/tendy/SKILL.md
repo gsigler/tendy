@@ -1,6 +1,6 @@
 ---
 name: tendy
-description: Use the tendy garden-tracking MCP server. Invoke when the user wants to manage gardens, seasons, plantings, tasks, harvests, or catalog entries in tendy.
+description: Use the tendy garden-tracking MCP server. Invoke when the user wants to manage gardens, seasons, plantings, tasks, harvests, catalog entries, or photos in tendy.
 ---
 
 # Tendy MCP — Garden Tracker
@@ -11,6 +11,7 @@ Tendy is a personal garden tracker. Data is organized hierarchically:
 Garden → Season → Spaces (raised beds, trays, etc.)
                 → Plantings (individual crops)
                     → Tasks, Events, Harvests
+Photos can attach to: Season, Planting, Harvest, Space, or Catalog entry
 ```
 
 ## Connecting
@@ -183,6 +184,39 @@ Claude Desktop / MCP client config:
 4. updateSeason { status: "complete" }
 ```
 
+### Logging a harvest with a photo
+```
+1. recordHarvest { seasonId, crop, quantity, ... } → harvestId
+2. attachPhotoUrl { url: "https://...", harvestId, caption: "Big tomato day" }
+```
+
+### Uploading a photo from a device
+```
+1. requestPhotoUpload { seasonId, caption: "..." } → { photoId, uploadUrl, expiresIn: 900 }
+2. [User PUTs their file to uploadUrl from phone/browser]
+3. Photo is live at the returned url immediately after upload
+```
+
+### Browsing a season's progress photos
+```
+1. listPhotos { seasonId } → all photos attached to that season
+2. listPhotos { plantingId } → photos for a specific planting
+3. listPhotos { harvestId } → harvest photos
+```
+
+---
+
+## Photo tools
+
+| Tool | Key params | Notes |
+|------|-----------|-------|
+| `requestPhotoUpload` | `seasonId?`, `plantingId?`, `harvestId?`, `spaceId?`, `catalogId?`, `caption?`, `contentType?` | Returns `photoId`, `uploadUrl` (15 min), `url`. Requires R2 config on server. |
+| `attachPhotoUrl` | `url` (required), same attach targets, `caption?` | For already-hosted photos; no upload needed. |
+| `listPhotos` | At least one of: `seasonId`, `plantingId`, `harvestId`, `spaceId`, `catalogId` | Multiple filters return photos matching any of them. |
+| `getPhoto` | `photoId` | Single photo detail. |
+| `updatePhoto` | `photoId`, `caption?`, `takenAt?` | Update caption or timestamp. |
+| `deletePhoto` | `photoId` | Removes from DB and R2 storage (if applicable). |
+
 ---
 
 ## Tips
@@ -193,3 +227,6 @@ Claude Desktop / MCP client config:
 - `placeOnGrid` cells are zero-indexed `{row, col}` within the space dimensions
 - `getPlantingSchedule` requires the season to have `lastFrostDate` set and plantings to have matching catalog entries with `startIndoorsWeeks` / `daysToMaturity`
 - Always use `getSeasonSummary` first to orient yourself in a new season before taking actions
+- A photo can be attached to multiple entities at once (e.g. `seasonId` + `plantingId`)
+- `requestPhotoUpload` creates the DB record immediately — the photo is "pending" until the user uploads to the presigned URL
+- `attachPhotoUrl` is the easiest flow when the user shares an existing URL (Dropbox, iCloud, etc.)

@@ -10,6 +10,7 @@ import {
   seasons,
   gardens,
   harvests,
+  photos,
   apiKeys,
   users,
 } from "../db/schema.js";
@@ -20,6 +21,7 @@ import { app } from "../app.js";
  */
 export async function cleanDb() {
   clearBuckets();
+  await db.delete(photos);
   await db.delete(gridPlacements);
   await db.delete(harvests);
   await db.delete(events);
@@ -140,6 +142,65 @@ export async function createPlanting(
       crop: "Tomato",
       variety: "Cherokee Purple",
       sourceType: "seed",
+      ...overrides,
+    }),
+  });
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
+/**
+ * Record a harvest and return its id.
+ */
+export async function createHarvest(
+  token: string,
+  seasonId: string,
+  overrides: Record<string, unknown> = {},
+): Promise<string> {
+  const res = await app.request(`/api/v1/seasons/${seasonId}/harvests`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      crop: "Tomato",
+      quantity: 5,
+      quantityUnit: "fruits",
+      ...overrides,
+    }),
+  });
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
+/**
+ * Attach a photo by URL and return its id.
+ */
+export async function attachPhoto(
+  token: string,
+  url: string,
+  targets: Record<string, string> = {},
+): Promise<string> {
+  const res = await app.request("/api/v1/photos", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ url, ...targets }),
+  });
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
+/**
+ * Create a catalog entry and return its id.
+ */
+export async function createCatalogEntry(
+  token: string,
+  overrides: Record<string, unknown> = {},
+): Promise<string> {
+  const res = await app.request("/api/v1/catalog", {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      crop: "Tomato",
+      variety: "Cherokee Purple",
       ...overrides,
     }),
   });
