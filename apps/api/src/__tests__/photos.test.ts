@@ -13,11 +13,11 @@ import {
   attachPhoto,
 } from "./helpers.js";
 
-// Mock the storage service so tests don't need real R2 credentials
+// Mock the storage service so tests don't need real Railway Bucket credentials
 vi.mock("../services/storage.service.js", () => ({
   isConfigured: vi.fn(() => true),
   createUploadUrl: vi.fn(async () => "https://upload.example.com/presigned"),
-  getPublicUrl: vi.fn((key: string) => `https://cdn.example.com/${key}`),
+  createDownloadUrl: vi.fn(async (key: string) => `https://download.example.com/${key}`),
   deleteObject: vi.fn(async () => undefined),
 }));
 
@@ -205,15 +205,15 @@ describe("Photos", () => {
 
   describe("POST /api/v1/photos/upload-url", () => {
     it("returns a presigned upload URL and photoId", async () => {
-      const { isConfigured, createUploadUrl, getPublicUrl } = await import(
+      const { isConfigured, createUploadUrl, createDownloadUrl } = await import(
         "../services/storage.service.js"
       );
       (isConfigured as ReturnType<typeof vi.fn>).mockReturnValue(true);
       (createUploadUrl as ReturnType<typeof vi.fn>).mockResolvedValue(
         "https://upload.example.com/presigned",
       );
-      (getPublicUrl as ReturnType<typeof vi.fn>).mockReturnValue(
-        "https://cdn.example.com/photos/user/uuid",
+      (createDownloadUrl as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "https://download.example.com/photos/user/uuid",
       );
 
       const res = await app.request("/api/v1/photos/upload-url", {
@@ -229,8 +229,9 @@ describe("Photos", () => {
       const data = await res.json() as Record<string, unknown>;
       expect(data.photoId).toBeDefined();
       expect(data.uploadUrl).toBe("https://upload.example.com/presigned");
-      expect(data.expiresIn).toBe(900);
-      expect(data.url).toBeDefined();
+      expect(data.uploadExpiresIn).toBe(900);
+      expect(data.url).toBe("https://download.example.com/photos/user/uuid");
+      expect(data.urlExpiresIn).toBe(3600);
     });
 
     it("returns 503 when storage is not configured", async () => {
@@ -394,6 +395,58 @@ describe("Photos", () => {
       const res = await app.request(`/api/v1/photos/${photoId}`, {
         headers: authHeaders(token),
       });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  // ── GET /api/v1/photos/:photoId/url ────────────────────────────────────
+
+  describe("GET /api/v1/photos/:photoId/url", () => {
+    it("returns the external url as-is for non-storage photos", async () => {
+      const photoId = await attachPhoto(
+        token,
+        "https://example.com/photo.jpg",
+        { seasonId },
+      );
+
+      const res = await app.request(`/api/v1/photos/${photoId}/url`, {
+        headers: authHeaders(token),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json() as Record<string, unknown>;
+      expect(data.url).toBe("https://example.com/photo.jpg");
+      expect(data.expiresIn).toBeNull();
+    });
+
+    it("returns a fresh presigned GET URL for a bucket-backed photo", async () => {
+      const { createDownloadUrl } = await import("../services/storage.service.js");
+      (createDownloadUrl as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "https://download.example.com/fresh-url",
+      );
+
+      // Create via upload-url to get a storageKey-backed photo
+      const uploadRes = await app.request("/api/v1/photos/upload-url", {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ seasonId }),
+      });
+      const uploadData = await uploadRes.json() as Record<string, unknown>;
+      const photoId = uploadData.photoId as string;
+
+      const res = await app.request(`/api/v1/photos/${photoId}/url`, {
+        headers: authHeaders(token),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json() as Record<string, unknown>;
+      expect(data.url).toBe("https://download.example.com/fresh-url");
+      expect(data.expiresIn).toBe(3600);
+    });
+
+    it("returns 404 for non-existent photo", async () => {
+      const res = await app.request(
+        "/api/v1/photos/00000000-0000-0000-0000-000000000000/url",
+        { headers: authHeaders(token) },
+      );
       expect(res.status).toBe(404);
     });
   });

@@ -11,7 +11,7 @@ import {
 } from "../db/schema.js";
 import * as storage from "./storage.service.js";
 
-// ── Attachment target ───────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────────────
 
 interface AttachTarget {
   seasonId?: string;
@@ -20,6 +20,8 @@ interface AttachTarget {
   spaceId?: string;
   catalogId?: string;
 }
+
+type PhotoRow = typeof photos.$inferSelect;
 
 // ── Ownership helpers ───────────────────────────────────────────────────────
 
@@ -140,11 +142,33 @@ async function validateTargets(
   return null;
 }
 
+/**
+ * For Railway-backed photos (storageKey set), generate a fresh presigned GET
+ * URL and substitute it for the raw storage key stored in the url column.
+ * For external-URL photos (storageKey null), the url field is returned as-is.
+ */
+async function enrichUrl(photo: PhotoRow): Promise<PhotoRow> {
+  if (photo.storageKey && storage.isConfigured()) {
+    try {
+      const signedUrl = await storage.createDownloadUrl(photo.storageKey);
+      return { ...photo, url: signedUrl };
+    } catch {
+      // If presigning fails (e.g. misconfigured creds) return the key as-is
+    }
+  }
+  return photo;
+}
+
+async function enrichUrls(rows: PhotoRow[]): Promise<PhotoRow[]> {
+  return Promise.all(rows.map(enrichUrl));
+}
+
 // ── Public service functions ────────────────────────────────────────────────
 
 /**
- * Request a presigned PUT URL for direct-to-R2 upload.
+ * Request a presigned PUT URL for direct-to-bucket upload.
  * Creates a photo record immediately so the ID is known before the upload.
+ * The `url` field in the response is a presigned GET URL valid for 1 hour.
  */
 export async function requestUploadUrl(
   userId: string,
@@ -155,18 +179,20 @@ export async function requestUploadUrl(
   } & AttachTarget,
 ) {
   if (!storage.isConfigured()) {
-    return { error: "Storage not configured. Set R2_* environment variables." as const };
+    return {
+      error:
+        "Storage not configured. Attach a Railway Bucket and ensure ACCESS_KEY_ID, SECRET_ACCESS_KEY, BUCKET, and ENDPOINT are set." as const,
+    };
   }
 
   const err = await validateTargets(userId, params);
   if (err) return { error: err as string };
 
   const key = `photos/${userId}/${crypto.randomUUID()}`;
-  const uploadUrl = await storage.createUploadUrl(
-    key,
-    params.contentType ?? "image/jpeg",
-  );
-  const url = storage.getPublicUrl(key);
+  const [uploadUrl, downloadUrl] = await Promise.all([
+    storage.createUploadUrl(key, params.contentType ?? "image/jpeg"),
+    storage.createDownloadUrl(key),
+  ]);
 
   const [photo] = await db
     .insert(photos)
@@ -178,17 +204,25 @@ export async function requestUploadUrl(
       spaceId: params.spaceId,
       catalogId: params.catalogId,
       storageKey: key,
-      url,
+      // Store the raw key; enrichUrl() regenerates a signed URL on each read.
+      // We return a fresh signed URL in this response for immediate use.
+      url: key,
       caption: params.caption,
       takenAt: params.takenAt ? new Date(params.takenAt) : new Date(),
     })
     .returning();
 
-  return { photoId: photo.id, uploadUrl, expiresIn: 900, url };
+  return {
+    photoId: photo.id,
+    uploadUrl,
+    uploadExpiresIn: 900,
+    url: downloadUrl,
+    urlExpiresIn: 3600,
+  };
 }
 
 /**
- * Attach an externally-hosted photo URL (no R2 upload needed).
+ * Attach an externally-hosted photo URL (no bucket upload needed).
  */
 export async function attachUrl(
   userId: string,
@@ -221,7 +255,8 @@ export async function attachUrl(
 }
 
 /**
- * List photos for a given entity. Exactly one filter must be provided.
+ * List photos for a given entity. Provide at least one filter ID.
+ * Railway-backed photos have their url replaced with a fresh presigned GET URL.
  */
 export async function list(
   userId: string,
@@ -245,17 +280,22 @@ export async function list(
   if (filter.catalogId) conditions.push(eq(photos.catalogId, filter.catalogId));
 
   if (conditions.length === 0) {
-    return { error: "At least one filter (seasonId, plantingId, harvestId, spaceId, catalogId) is required" as string };
+    return {
+      error:
+        "At least one filter (seasonId, plantingId, harvestId, spaceId, catalogId) is required" as string,
+    };
   }
 
   const whereClause =
     conditions.length === 1 ? conditions[0] : or(...conditions);
 
-  return db
+  const rows = await db
     .select()
     .from(photos)
     .where(and(eq(photos.userId, userId), whereClause))
     .orderBy(desc(photos.takenAt));
+
+  return enrichUrls(rows);
 }
 
 export async function get(userId: string, photoId: string) {
@@ -265,7 +305,39 @@ export async function get(userId: string, photoId: string) {
     .from(photos)
     .where(eq(photos.id, photoId))
     .limit(1);
-  return photo ?? null;
+  if (!photo) return null;
+  return enrichUrl(photo);
+}
+
+/**
+ * Generate a fresh presigned GET URL for a Railway-backed photo.
+ * Returns the external URL as-is for non-storage photos.
+ */
+export async function getUrl(
+  userId: string,
+  photoId: string,
+  expiresIn = 3600,
+) {
+  if (!(await verifyPhotoOwnership(userId, photoId))) {
+    return { error: "Photo not found" as const };
+  }
+  const [photo] = await db
+    .select({ storageKey: photos.storageKey, url: photos.url })
+    .from(photos)
+    .where(eq(photos.id, photoId))
+    .limit(1);
+  if (!photo) return { error: "Photo not found" as const };
+
+  if (!photo.storageKey) {
+    return { url: photo.url, expiresIn: null };
+  }
+
+  if (!storage.isConfigured()) {
+    return { error: "Storage not configured" as const };
+  }
+
+  const url = await storage.createDownloadUrl(photo.storageKey, expiresIn);
+  return { url, expiresIn };
 }
 
 /**
@@ -292,11 +364,12 @@ export async function update(
     .where(eq(photos.id, photoId))
     .returning();
 
-  return photo ?? null;
+  if (!photo) return null;
+  return enrichUrl(photo);
 }
 
 /**
- * Delete a photo. If it was uploaded to R2, also removes it from storage.
+ * Delete a photo. If it was uploaded to storage, also removes it from the bucket.
  */
 export async function del(userId: string, photoId: string) {
   const [photo] = await db

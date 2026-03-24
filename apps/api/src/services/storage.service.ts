@@ -1,73 +1,89 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-function getClient(): S3Client {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+/**
+ * Railway Buckets — S3-compatible object storage.
+ *
+ * Required env vars (auto-injected by Railway when a bucket is attached):
+ *   ACCESS_KEY_ID, SECRET_ACCESS_KEY, BUCKET, ENDPOINT, REGION
+ *
+ * Buckets are private by default. All photo access uses presigned URLs;
+ * there is no public base URL.
+ */
 
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error("R2 storage is not configured");
+function getClient(): S3Client {
+  const accessKeyId = process.env.ACCESS_KEY_ID;
+  const secretAccessKey = process.env.SECRET_ACCESS_KEY;
+  const endpoint = process.env.ENDPOINT;
+  const region = process.env.REGION ?? "auto";
+
+  if (!accessKeyId || !secretAccessKey || !endpoint) {
+    throw new Error("Storage is not configured (missing ACCESS_KEY_ID, SECRET_ACCESS_KEY, or ENDPOINT)");
   }
 
   return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    region,
+    endpoint,
     credentials: { accessKeyId, secretAccessKey },
   });
 }
 
 function getBucket(): string {
-  const bucket = process.env.R2_BUCKET_NAME;
-  if (!bucket) throw new Error("R2_BUCKET_NAME is not configured");
+  const bucket = process.env.BUCKET;
+  if (!bucket) throw new Error("BUCKET env var is not configured");
   return bucket;
 }
 
 export function isConfigured(): boolean {
   return !!(
-    process.env.R2_ACCOUNT_ID &&
-    process.env.R2_ACCESS_KEY_ID &&
-    process.env.R2_SECRET_ACCESS_KEY &&
-    process.env.R2_BUCKET_NAME &&
-    process.env.R2_PUBLIC_URL
+    process.env.ACCESS_KEY_ID &&
+    process.env.SECRET_ACCESS_KEY &&
+    process.env.BUCKET &&
+    process.env.ENDPOINT
   );
 }
 
 /**
- * Generate a presigned PUT URL for uploading a photo directly to R2.
- * The URL is valid for 15 minutes.
+ * Generate a presigned PUT URL for uploading a photo directly from a device.
+ * Valid for 15 minutes.
  */
 export async function createUploadUrl(
   key: string,
   contentType = "image/jpeg",
 ): Promise<string> {
-  const client = getClient();
   const command = new PutObjectCommand({
     Bucket: getBucket(),
     Key: key,
     ContentType: contentType,
   });
-  return getSignedUrl(client, command, { expiresIn: 900 });
+  return getSignedUrl(getClient(), command, { expiresIn: 900 });
 }
 
 /**
- * Delete an object from R2. Best-effort — errors are logged but not rethrown
- * so a storage failure doesn't block the DB delete.
+ * Generate a presigned GET URL for reading a private photo.
+ * Default expiry: 1 hour. Bump to 86400 (24h) for longer-lived links.
+ */
+export async function createDownloadUrl(
+  key: string,
+  expiresIn = 3600,
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: getBucket(),
+    Key: key,
+  });
+  return getSignedUrl(getClient(), command, { expiresIn });
+}
+
+/**
+ * Delete an object from storage. Best-effort — caller handles error logging.
  */
 export async function deleteObject(key: string): Promise<void> {
-  const client = getClient();
-  await client.send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }));
-}
-
-/**
- * Build the public URL for a stored object using the configured R2 public domain.
- */
-export function getPublicUrl(key: string): string {
-  const base = process.env.R2_PUBLIC_URL;
-  if (!base) throw new Error("R2_PUBLIC_URL is not configured");
-  return `${base.replace(/\/$/, "")}/${key}`;
+  await getClient().send(
+    new DeleteObjectCommand({ Bucket: getBucket(), Key: key }),
+  );
 }

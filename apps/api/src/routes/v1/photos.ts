@@ -98,12 +98,25 @@ photosRoutes.get("/photos", async (c) => {
   return c.json(result);
 });
 
-// Get a single photo
+// Get a single photo (url is a fresh presigned GET URL for bucket-backed photos)
 photosRoutes.get("/photos/:photoId", async (c) => {
   const userId = c.get("userId");
   const photoId = c.req.param("photoId");
   const result = await photoService.get(userId, photoId);
   if (!result) return c.json({ error: "Not found" }, 404);
+  return c.json(result);
+});
+
+// Get a fresh presigned download URL for a photo
+photosRoutes.get("/photos/:photoId/url", async (c) => {
+  const userId = c.get("userId");
+  const photoId = c.req.param("photoId");
+  const expiresIn = Number(c.req.query("expiresIn")) || 3600;
+  const result = await photoService.getUrl(userId, photoId, expiresIn);
+  if ("error" in result) {
+    const status = result.error === "Photo not found" ? 404 : 503;
+    return c.json(result, status);
+  }
   return c.json(result);
 });
 

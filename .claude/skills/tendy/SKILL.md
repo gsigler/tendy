@@ -210,12 +210,13 @@ Claude Desktop / MCP client config:
 
 | Tool | Key params | Notes |
 |------|-----------|-------|
-| `requestPhotoUpload` | `seasonId?`, `plantingId?`, `harvestId?`, `spaceId?`, `catalogId?`, `caption?`, `contentType?` | Returns `photoId`, `uploadUrl` (15 min), `url`. Requires R2 config on server. |
+| `requestPhotoUpload` | `seasonId?`, `plantingId?`, `harvestId?`, `spaceId?`, `catalogId?`, `caption?`, `contentType?` | Returns `photoId`, `uploadUrl` (15 min PUT), `url` (1 hr GET). Requires Railway Bucket config. |
 | `attachPhotoUrl` | `url` (required), same attach targets, `caption?` | For already-hosted photos; no upload needed. |
-| `listPhotos` | At least one of: `seasonId`, `plantingId`, `harvestId`, `spaceId`, `catalogId` | Multiple filters return photos matching any of them. |
-| `getPhoto` | `photoId` | Single photo detail. |
+| `listPhotos` | At least one of: `seasonId`, `plantingId`, `harvestId`, `spaceId`, `catalogId` | Multiple filters return photos matching any of them. URLs are fresh presigned GETs. |
+| `getPhoto` | `photoId` | Single photo detail with a fresh presigned GET URL. |
+| `getPhotoUrl` | `photoId`, `expiresIn?` (60–86400, default 3600) | Get a fresh presigned download URL. Use when a previously returned URL has expired. |
 | `updatePhoto` | `photoId`, `caption?`, `takenAt?` | Update caption or timestamp. |
-| `deletePhoto` | `photoId` | Removes from DB and R2 storage (if applicable). |
+| `deletePhoto` | `photoId` | Removes from DB and Railway Bucket storage (if applicable). |
 
 ---
 
@@ -228,5 +229,7 @@ Claude Desktop / MCP client config:
 - `getPlantingSchedule` requires the season to have `lastFrostDate` set and plantings to have matching catalog entries with `startIndoorsWeeks` / `daysToMaturity`
 - Always use `getSeasonSummary` first to orient yourself in a new season before taking actions
 - A photo can be attached to multiple entities at once (e.g. `seasonId` + `plantingId`)
-- `requestPhotoUpload` creates the DB record immediately — the photo is "pending" until the user uploads to the presigned URL
+- `requestPhotoUpload` creates the DB record immediately — the photo is "pending" until the user uploads to the presigned PUT URL
 - `attachPhotoUrl` is the easiest flow when the user shares an existing URL (Dropbox, iCloud, etc.)
+- All `get`/`list` calls for bucket-backed photos return fresh presigned GET URLs (1 hr expiry). Call `getPhotoUrl` to get a new URL after expiry.
+- Railway Bucket env vars: `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `BUCKET`, `ENDPOINT`, `REGION` — auto-injected when a bucket is attached to the service

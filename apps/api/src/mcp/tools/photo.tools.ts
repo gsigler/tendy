@@ -166,8 +166,42 @@ export function registerPhotoTools(server: McpServer, userId: string) {
   );
 
   server.tool(
+    "getPhotoUrl",
+    "Get a fresh presigned download URL for a Railway-bucket-backed photo. Useful when a previously returned URL has expired. Returns the external URL as-is for photos attached by URL. Default expiry is 1 hour; pass expiresIn (seconds) to customize.",
+    {
+      photoId: z.string().describe("Photo ID"),
+      expiresIn: z
+        .number()
+        .int()
+        .min(60)
+        .max(86400)
+        .optional()
+        .describe("URL expiry in seconds (60–86400, default 3600)"),
+    },
+    async ({ photoId, expiresIn }) => {
+      try {
+        const result = await photoService.getUrl(userId, photoId, expiresIn);
+        if ("error" in result)
+          return {
+            content: [{ type: "text" as const, text: String(result.error) }],
+            isError: true,
+          };
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (e) {
+        console.error("[mcp] tool error:", e);
+        return {
+          content: [{ type: "text" as const, text: "An error occurred. Please try again." }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.tool(
     "deletePhoto",
-    "Delete a photo. If the photo was uploaded to R2 storage, it is also removed from the bucket.",
+    "Delete a photo. If the photo was uploaded to Railway Bucket storage, it is also removed from the bucket.",
     { photoId: z.string().describe("Photo ID") },
     async ({ photoId }) => {
       try {
