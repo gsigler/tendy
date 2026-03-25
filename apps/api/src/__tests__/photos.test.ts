@@ -236,7 +236,7 @@ describe("Photos", () => {
 
     it("returns 503 when storage is not configured", async () => {
       const { isConfigured } = await import("../services/storage.service.js");
-      (isConfigured as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      (isConfigured as ReturnType<typeof vi.fn>).mockReturnValueOnce(false);
 
       const res = await app.request("/api/v1/photos/upload-url", {
         method: "POST",

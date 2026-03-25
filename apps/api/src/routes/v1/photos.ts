@@ -53,10 +53,7 @@ photosRoutes.post("/photos/upload-url", async (c) => {
   }
   const result = await photoService.requestUploadUrl(userId, parsed.data);
   if ("error" in result) {
-    const status =
-      result.error === "Storage not configured. Set R2_* environment variables."
-        ? 503
-        : 404;
+    const status = result.error?.startsWith("Storage not configured") ? 503 : 404;
     return c.json(result, status);
   }
   return c.json(result, 201);
