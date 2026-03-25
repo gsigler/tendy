@@ -13,7 +13,7 @@ const attachTargetSchema = {
 export function registerPhotoTools(server: McpServer, userId: string) {
   server.tool(
     "requestPhotoUpload",
-    "Generate a presigned upload URL so a device can PUT a photo directly to cloud storage. Returns a photoId (already saved in the DB) and an uploadUrl valid for 15 minutes. Requires R2 storage to be configured on the server.",
+    "Generate a presigned upload URL so a device can PUT a photo directly to cloud storage. Returns a photoId (already saved in the DB) and an uploadUrl valid for 15 minutes. Requires Railway Bucket storage to be configured on the server (ACCESS_KEY_ID, SECRET_ACCESS_KEY, BUCKET, ENDPOINT env vars).",
     {
       ...attachTargetSchema,
       contentType: z
