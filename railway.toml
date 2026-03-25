@@ -3,3 +3,4 @@ buildCommand = "turbo build"
 
 [deploy]
 startCommand = "node apps/api/dist/index.js"
+preDeployCommand = "node apps/api/dist/db/migrate.js"
