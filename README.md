@@ -1,6 +1,6 @@
 # Tendy
 
-Garden management CRUD API with MCP (Model Context Protocol) server interface. Built with Hono, PostgreSQL, Drizzle ORM, and JWT auth.
+Garden management API with an MCP (Model Context Protocol) server interface. Built with Hono, PostgreSQL, Drizzle ORM, and JWT auth.
 
 ## Structure
 
@@ -11,7 +11,7 @@ tendy/
 │   ├── src/routes/v1/   # REST API route handlers
 │   ├── src/mcp/         # MCP server + tool definitions
 │   ├── src/db/          # Drizzle schema + migrations
-│   └── src/middleware/   # JWT/API key auth
+│   └── src/middleware/  # JWT/API key auth
 ├── packages/shared/     # Shared types & Zod schemas
 └── docker-compose.yml   # API + PostgreSQL
 ```
@@ -70,25 +70,53 @@ All `/api/v1/*` routes require auth (except `/api/v1/auth/*`).
 | Tasks | `GET/POST /seasons/:id/tasks`, `GET/PATCH/DELETE /tasks/:id`, complete, skip |
 | Events | `GET/POST /seasons/:id/events`, `DELETE /events/:id` |
 | Harvests | `GET/POST /seasons/:id/harvests`, `GET/PATCH/DELETE /harvests/:id`, `GET /seasons/:id/harvest-summary` |
+| Photos | `GET/POST /seasons/:id/photos`, `GET/PATCH/DELETE /photos/:id` |
 | Catalog | `GET/POST /catalog`, `GET/PATCH/DELETE /catalog/:id`, reviews |
 | Planning | `GET /seasons/:id/week-plan`, `GET /seasons/:id/planting-schedule`, `POST /seasons/:id/generate-tasks` |
 | API Keys | `GET/POST /api-keys`, `DELETE /api-keys/:id` |
 
+## Photos
+
+Photos can be attached to seasons, plantings, harvests, spaces, or catalog entries. Storage uses Railway Buckets (S3-compatible). The upload flow uses presigned URLs:
+
+1. `POST /api/v1/photos/upload-url` — generates a presigned PUT URL and creates the photo record
+2. Client PUTs the file directly to the returned URL
+3. `GET /api/v1/photos/:id` — generates a fresh presigned GET URL for viewing
+
+If Railway Buckets aren't configured, photos can store an external URL directly instead.
+
 ## MCP Server
 
-54 tools exposed via Streamable HTTP transport at `POST /mcp`.
+59 tools exposed via SSE transport.
 
-MCP clients authenticate with a Bearer token (JWT or API key) and manage sessions via the `mcp-session-id` header.
+- **Establish session:** `GET /mcp` — opens the SSE stream, returns a `sessionId`
+- **Send messages:** `POST /mcp/message?sessionId=<id>`
+- **Auth:** `Authorization: Bearer <token>` (JWT or API key)
+
+```json
+{
+  "mcpServers": {
+    "tendy": {
+      "url": "https://your-tendy-url.com/mcp",
+      "headers": {
+        "Authorization": "Bearer tndy_your_api_key_here"
+      }
+    }
+  }
+}
+```
 
 ## Development
 
 ```bash
-pnpm typecheck        # Typecheck all packages
-pnpm --filter @tendy/api test   # Run tests (118 tests)
-pnpm --filter @tendy/api db:generate  # Generate migration
-pnpm --filter @tendy/api db:migrate   # Run migrations
-pnpm --filter @tendy/api db:studio    # Drizzle Studio
+pnpm typecheck                          # Typecheck all packages
+pnpm --filter @tendy/api test          # Run tests (~150 tests)
+pnpm --filter @tendy/api db:generate   # Generate a new migration
+pnpm --filter @tendy/api db:migrate    # Run pending migrations
+pnpm --filter @tendy/api db:studio     # Drizzle Studio
 ```
+
+> **Note:** Always use `db:generate` to create migrations — never edit `drizzle/meta/_journal.json` by hand. A wrong `when` timestamp causes Drizzle to silently skip the migration on deploy.
 
 ## Tech Stack
 
@@ -96,9 +124,10 @@ pnpm --filter @tendy/api db:studio    # Drizzle Studio
 |-------|-----------|
 | Runtime | Node.js 22 |
 | Framework | Hono |
-| MCP | @modelcontextprotocol/sdk |
+| MCP | @modelcontextprotocol/sdk (SSE transport) |
 | Database | PostgreSQL 16 + Drizzle ORM |
 | Auth | JWT (jose) + API keys + bcryptjs |
+| Storage | Railway Buckets (S3-compatible, presigned URLs) |
 | Validation | Zod |
 | Monorepo | pnpm workspaces + Turborepo |
-| Deploy | Docker |
+| Deploy | Railway |
