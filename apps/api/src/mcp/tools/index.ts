@@ -8,6 +8,7 @@ import { registerEventTools } from "./event.tools.js";
 import { registerCatalogTools } from "./catalog.tools.js";
 import { registerPlanningTools } from "./planning.tools.js";
 import { registerHarvestTools } from "./harvest.tools.js";
+import { registerPhotoTools } from "./photo.tools.js";
 
 export function registerAllTools(server: McpServer, userId: string) {
   registerGardenTools(server, userId);
@@ -19,4 +20,5 @@ export function registerAllTools(server: McpServer, userId: string) {
   registerCatalogTools(server, userId);
   registerPlanningTools(server, userId);
   registerHarvestTools(server, userId);
+  registerPhotoTools(server, userId);
 }

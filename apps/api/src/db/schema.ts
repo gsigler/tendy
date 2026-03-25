@@ -382,3 +382,31 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   }),
   space: one(spaces, { fields: [tasks.spaceId], references: [spaces.id] }),
 }));
+
+// ── Photos ─────────────────────────────────────────────────────────────────
+
+export const photos = pgTable("photos", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  seasonId: uuid("season_id").references(() => seasons.id, { onDelete: "set null" }),
+  plantingId: uuid("planting_id").references(() => plantings.id, { onDelete: "set null" }),
+  harvestId: uuid("harvest_id").references(() => harvests.id, { onDelete: "set null" }),
+  spaceId: uuid("space_id").references(() => spaces.id, { onDelete: "set null" }),
+  catalogId: uuid("catalog_id").references(() => catalogEntries.id, { onDelete: "set null" }),
+  storageKey: text("storage_key"),
+  url: text("url").notNull(),
+  caption: text("caption"),
+  takenAt: timestamp("taken_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const photosRelations = relations(photos, ({ one }) => ({
+  user: one(users, { fields: [photos.userId], references: [users.id] }),
+  season: one(seasons, { fields: [photos.seasonId], references: [seasons.id] }),
+  planting: one(plantings, { fields: [photos.plantingId], references: [plantings.id] }),
+  harvest: one(harvests, { fields: [photos.harvestId], references: [harvests.id] }),
+  space: one(spaces, { fields: [photos.spaceId], references: [spaces.id] }),
+  catalog: one(catalogEntries, { fields: [photos.catalogId], references: [catalogEntries.id] }),
+}));

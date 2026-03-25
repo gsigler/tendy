@@ -10,6 +10,7 @@ import { events } from "./events.js";
 import { catalog } from "./catalog.js";
 import { planning } from "./planning.js";
 import { harvestsRoutes } from "./harvests.js";
+import { photosRoutes } from "./photos.js";
 import { apiKeysRoutes } from "./api-keys.js";
 
 export const v1Routes = new Hono<AuthEnv>();
@@ -28,3 +29,4 @@ v1Routes.route("/", events);
 v1Routes.route("/catalog", catalog);
 v1Routes.route("/", planning);
 v1Routes.route("/", harvestsRoutes);
+v1Routes.route("/", photosRoutes);
