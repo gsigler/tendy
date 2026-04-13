@@ -105,12 +105,13 @@ const mcpBearerAuth = requireBearerAuth({
   resourceMetadataUrl: new URL("/.well-known/oauth-protected-resource/mcp", baseUrl).href,
 });
 
-// Streamable HTTP MCP endpoint (Express route -> raw Node.js handler)
+// Streamable HTTP MCP endpoint
+// Pass req.body as parsedBody since Express body-parser already consumed the stream
 expressApp.all("/mcp", mcpBearerAuth, async (req, res) => {
-  // Cast to raw Node.js types — the Express req/res extend IncomingMessage/ServerResponse
   await handleStreamableRequest(
     req as unknown as IncomingMessage & { auth?: import("@modelcontextprotocol/sdk/server/auth/types.js").AuthInfo },
     res as unknown as ServerResponse,
+    req.body,
   );
 });
 

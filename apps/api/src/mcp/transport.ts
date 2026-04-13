@@ -19,10 +19,12 @@ const streamableSessions = new Map<string, StreamableSession>();
  * Supports POST (JSON-RPC messages), GET (SSE listener), DELETE (session end).
  *
  * The `req.auth` property should be set by auth middleware before calling this.
+ * `parsedBody` should be passed when Express body-parser has already consumed the stream.
  */
 export async function handleStreamableRequest(
   req: IncomingMessage & { auth?: AuthInfo },
   res: ServerResponse,
+  parsedBody?: unknown,
 ): Promise<void> {
   const userId = req.auth?.extra?.userId as string | undefined;
   if (!userId) {
@@ -33,7 +35,7 @@ export async function handleStreamableRequest(
 
   const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-  // Route to existing session
+  // Route to existing session — let the transport handle all methods (POST/GET/DELETE)
   if (sessionId && streamableSessions.has(sessionId)) {
     const session = streamableSessions.get(sessionId)!;
 
@@ -44,31 +46,25 @@ export async function handleStreamableRequest(
       return;
     }
 
-    await session.transport.handleRequest(req, res);
+    await session.transport.handleRequest(req, res, parsedBody);
     return;
   }
 
-  // For DELETE with unknown session, return 404
-  if (req.method === "DELETE") {
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Session not found" }));
-    return;
-  }
-
-  // For non-init requests with an unknown session ID, return 404
+  // Unknown session ID → 404 (for any method)
   if (sessionId) {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Session not found" }));
     return;
   }
 
-  // New session — only POST with InitializeRequest should reach here
+  // No session ID + not POST → new session can only start with POST InitializeRequest
   if (req.method !== "POST") {
-    res.writeHead(405, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Method not allowed" }));
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Missing Mcp-Session-Id header. POST an InitializeRequest first." }));
     return;
   }
 
+  // New session — POST with InitializeRequest
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
   });
@@ -84,7 +80,7 @@ export async function handleStreamableRequest(
   };
 
   // Handle the InitializeRequest — this sets transport.sessionId
-  await transport.handleRequest(req, res);
+  await transport.handleRequest(req, res, parsedBody);
 
   if (transport.sessionId) {
     streamableSessions.set(transport.sessionId, { transport, userId });
