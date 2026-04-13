@@ -36,6 +36,13 @@
       "when": 1774411131568,
       "tag": "0004_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776101493000,
+      "tag": "0005_oauth_tables",
+      "breakpoints": true
     }
   ]
 }

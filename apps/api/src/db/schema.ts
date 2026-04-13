@@ -410,3 +410,56 @@ export const photosRelations = relations(photos, ({ one }) => ({
   space: one(spaces, { fields: [photos.spaceId], references: [spaces.id] }),
   catalog: one(catalogEntries, { fields: [photos.catalogId], references: [catalogEntries.id] }),
 }));
+
+// ── OAuth Clients (Dynamic Client Registration, RFC 7591) ─────────────
+
+export const oauthClients = pgTable("oauth_clients", {
+  clientId: varchar("client_id", { length: 255 }).primaryKey(),
+  clientSecret: varchar("client_secret", { length: 255 }),
+  clientIdIssuedAt: integer("client_id_issued_at").notNull(),
+  clientSecretExpiresAt: integer("client_secret_expires_at"),
+  redirectUris: jsonb("redirect_uris").notNull().$type<string[]>(),
+  clientName: varchar("client_name", { length: 255 }),
+  tokenEndpointAuthMethod: varchar("token_endpoint_auth_method", { length: 50 }),
+  grantTypes: jsonb("grant_types").$type<string[]>(),
+  responseTypes: jsonb("response_types").$type<string[]>(),
+  scope: text("scope"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+// ── OAuth Authorization Codes ─────────────────────────────────────────
+
+export const oauthCodes = pgTable("oauth_codes", {
+  code: varchar("code", { length: 255 }).primaryKey(),
+  clientId: varchar("client_id", { length: 255 }).notNull(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  codeChallenge: varchar("code_challenge", { length: 255 }).notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  scope: text("scope"),
+  resource: text("resource"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+// ── OAuth Tokens ──────────────────────────────────────────────────────
+
+export const oauthTokens = pgTable("oauth_tokens", {
+  token: varchar("token", { length: 512 }).primaryKey(),
+  tokenType: varchar("token_type", { length: 20 }).notNull(), // 'access' or 'refresh'
+  clientId: varchar("client_id", { length: 255 }).notNull(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  scope: text("scope"),
+  resource: text("resource"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
