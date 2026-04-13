@@ -40,6 +40,9 @@ const oauthProvider = new TendyOAuthProvider();
 // Express app for OAuth endpoints (SDK's auth router requires Express)
 const expressApp = express();
 
+// Trust reverse proxy (Railway, etc.) so express-rate-limit sees real client IPs
+expressApp.set("trust proxy", 1);
+
 // Parse URL-encoded bodies for the login form
 expressApp.use(express.urlencoded({ extended: false }));
 expressApp.use(express.json());
